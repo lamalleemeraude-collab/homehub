@@ -1,0 +1,29 @@
+[Unit]
+Description=HomeHub (Next.js) — francoislamalle.fr/hub
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/homehub
+
+# Adapter le chemin Node si besoin (which node)
+Environment=NODE_ENV=production
+Environment=BASE_PATH=/hub
+Environment=PORT=3000
+# Charger les secrets (calendriers, OpenAI, webhook…) :
+EnvironmentFile=-/var/www/homehub/.env.local
+
+# Build standalone : après `npm run build:hub`, le serveur est ici.
+# Copier aussi public/ et .next/static comme indiqué dans DEPLOY-OVH.md.
+ExecStart=/usr/bin/node /var/www/homehub/.next/standalone/server.js
+
+Restart=on-failure
+RestartSec=5
+
+# Écriture webhook iPhone / data/
+ReadWritePaths=/var/www/homehub/data
+
+[Install]
+WantedBy=multi-user.target
