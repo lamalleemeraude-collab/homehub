@@ -3,8 +3,16 @@ import {
   formatEventSchedule,
   isAllDayEvent,
   type HubEvent,
+  type HubEventType,
 } from "@/lib/hub-events";
 import type { IPhoneSyncEvent } from "./types";
+
+function hubTypeFromCalendar(calendar: string): HubEventType {
+  const name = calendar.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (name.includes("maelle") || name.includes("college")) return "maelle";
+  if (name.includes("roulle") || name.includes("philippe")) return "roulle";
+  return "papa";
+}
 
 /** Événements reçus via le Raccourci iOS → webhook-calendar */
 export function webhookCalendarToHubEvents(
@@ -18,12 +26,11 @@ export function webhookCalendarToHubEvents(
       end: event.end,
       allDay,
     });
-
     return {
       id: event.id,
       date,
       title: event.title,
-      type: "papa",
+      type: hubTypeFromCalendar(event.calendar),
       fromWebhook: true,
       sourceCalendar: event.calendar,
       details: `${event.calendar} — ${schedule}`,

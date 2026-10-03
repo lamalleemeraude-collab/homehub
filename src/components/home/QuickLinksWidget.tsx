@@ -4,16 +4,17 @@ import { BentoCard } from "@/components/ui/BentoCard";
 import { nextBusSummary } from "@/lib/bus-schedule";
 import { PASTEL_GRADIENTS, PASTEL_ICON } from "@/lib/ui/pastel-theme";
 
-const EXTERNAL_LINKS = [
+const QUICK_LINKS = [
   {
     id: "ecoledirecte",
-    label: "EcoleDirecte",
-    description: "Notes, messagerie & absences",
-    href: "https://www.ecoledirecte.com/login?cameFrom=%2F1%2F3092%2FMessagerie",
+    label: "Révisions",
+    description: "Devoirs ÉcoleDirecte & flashcards",
+    href: "/devoirs",
     icon: GraduationCap,
     iconGradient: PASTEL_ICON.school,
     chip: PASTEL_GRADIENTS.school,
     ring: "active:ring-sky-200/60",
+    external: false,
   },
   {
     id: "clicetmiam",
@@ -24,6 +25,7 @@ const EXTERNAL_LINKS = [
     iconGradient: PASTEL_ICON.canteen,
     chip: PASTEL_GRADIENTS.canteen,
     ring: "active:ring-emerald-200/60",
+    external: true,
   },
 ] as const;
 
@@ -68,16 +70,11 @@ export function QuickLinksWidget() {
           </div>
         </Link>
 
-        {EXTERNAL_LINKS.map((link) => {
+        {QUICK_LINKS.map((link) => {
           const Icon = link.icon;
-          return (
-            <a
-              key={link.id}
-              href={link.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`touch-target group flex min-h-[4.5rem] items-center gap-3 rounded-2xl border border-white/50 bg-gradient-to-r ${link.chip} px-3 py-3 shadow-sm shadow-slate-200/20 transition-transform active:scale-[0.98] sm:gap-4 sm:px-4 sm:py-3.5 ${link.ring}`}
-            >
+          const className = `touch-target group flex min-h-[4.5rem] items-center gap-3 rounded-2xl border border-white/50 bg-gradient-to-r ${link.chip} px-3 py-3 shadow-sm shadow-slate-200/20 transition-transform active:scale-[0.98] sm:gap-4 sm:px-4 sm:py-3.5 ${link.ring}`;
+          const body = (
+            <>
               <div
                 className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${link.iconGradient} shadow-md shadow-slate-200/25 sm:h-12 sm:w-12`}
               >
@@ -99,7 +96,27 @@ export function QuickLinksWidget() {
                   strokeWidth={2.5}
                 />
               </div>
-            </a>
+            </>
+          );
+
+          if (link.external) {
+            return (
+              <a
+                key={link.id}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={className}
+              >
+                {body}
+              </a>
+            );
+          }
+
+          return (
+            <Link key={link.id} href={link.href} prefetch className={className}>
+              {body}
+            </Link>
           );
         })}
       </div>

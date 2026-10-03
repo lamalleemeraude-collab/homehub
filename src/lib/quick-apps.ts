@@ -40,8 +40,8 @@ export const COLLEGE_APPS: QuickApp[] = [
   {
     id: "ecoledirecte",
     label: "École",
-    href: "https://www.ecoledirecte.com/login?cameFrom=%2F1%2F3092%2FMessagerie",
-    external: true,
+    sub: "Collège",
+    href: "/ecole",
     icon: GraduationCap,
     accent: "school",
     iconGradient: PASTEL_ICON.school,

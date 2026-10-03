@@ -5,6 +5,7 @@ import { HomeNextUpStrip } from "./HomeNextUpStrip";
 import { HomeWeatherHud } from "./HomeWeatherHud";
 import { HomeNightProvider, useIsNight } from "./HomeNightContext";
 import { WeatherAmbientSky } from "./WeatherAmbientSky";
+import { RevisionsCta } from "./RevisionsCta";
 import { GLASS } from "@/lib/ui/pastel-theme";
 
 /**
@@ -34,8 +35,12 @@ export function BentoDashboard() {
             <HomeWeatherHud />
           </div>
 
+          <div className="home-bento-rise home-bento-rise-3 shrink-0">
+            <RevisionsCta />
+          </div>
+
           <div
-            className={`home-panel home-bento-rise home-bento-rise-3 min-h-0 flex-1 px-4 py-4 sm:px-5 ${GLASS.panel}`}
+            className={`home-panel home-bento-rise home-bento-rise-4 min-h-0 flex-1 px-4 py-4 sm:px-5 ${GLASS.panel}`}
           >
             <HomeNextUpStrip layout="soft" />
           </div>

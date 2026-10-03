@@ -41,6 +41,13 @@ export const navItems = [
     accent: "school" as const,
   },
   {
+    href: "/ecole",
+    label: "École",
+    shortLabel: "École",
+    icon: School,
+    accent: "school" as const,
+  },
+  {
     href: "/repas",
     label: "Repas",
     shortLabel: "Repas",
@@ -63,7 +70,14 @@ export const navItems = [
   },
 ] as const;
 
-const COLLEGE_PATHS = ["/docs-utiles", "/routine/sac", "/routine"];
+const COLLEGE_PATHS = [
+  "/docs-utiles",
+  "/routine/sac",
+  "/routine",
+  "/ecole",
+  "/devoirs",
+  "/flashcards",
+];
 
 function NavLink({
   href,
