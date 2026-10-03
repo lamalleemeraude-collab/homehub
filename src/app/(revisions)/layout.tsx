@@ -14,6 +14,9 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
   },
   manifest: "/manifest.json",
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export const viewport: Viewport = {
@@ -31,10 +34,8 @@ export default function RevisionsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="relative z-0 flex h-full min-h-0 flex-1 flex-col overflow-hidden text-slate-900">
-      <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-28">
-        {children}
-      </main>
+    <div className="mobile-app">
+      <main className="mobile-app__scroll">{children}</main>
       <BottomNav />
     </div>
   );

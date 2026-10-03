@@ -3,15 +3,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  ChevronRight,
-  RefreshCw,
-  School,
-} from "lucide-react";
+import { ChevronRight, RefreshCw, School } from "lucide-react";
 import { ECOLE_MODULES, moduleTone } from "@/lib/ecole/modules";
 import { formatHomeworkDay } from "@/lib/ecoledirecte/subjects";
 import type { StudentDashboard } from "@/lib/ecoledirecte/dashboard-types";
 import { GLASS } from "@/lib/ui/pastel-theme";
+import { MobileScreen } from "@/components/mobile/MobileScreen";
 
 type State =
   | { status: "loading" }
@@ -67,26 +64,24 @@ export function EcoleHome() {
     state.status === "ok" ? firstName(state.data.eleve) : "Maelle";
 
   return (
-    <div className="mx-auto w-full max-w-lg px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
+    <MobileScreen>
       <motion.header
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`relative overflow-hidden px-5 py-5 ${GLASS.panel}`}
+        className={`relative overflow-hidden px-3.5 py-3.5 sm:px-4 sm:py-4 ${GLASS.panel}`}
       >
-        <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-sky-300/30 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-12 left-0 h-32 w-32 rounded-full bg-teal-300/20 blur-3xl" />
+        <div className="pointer-events-none absolute -right-10 -top-12 h-36 w-36 rounded-full bg-sky-300/30 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-12 left-0 h-28 w-28 rounded-full bg-teal-300/20 blur-3xl" />
 
-        <div className="relative flex items-start justify-between gap-3">
-          <div>
-            <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-sky-600/80">
-              <School className="h-3.5 w-3.5" />
+        <div className="relative flex items-start justify-between gap-2.5">
+          <div className="min-w-0 flex-1">
+            <p className="inline-flex items-center gap-1 text-[0.65rem] font-bold uppercase tracking-[0.16em] text-sky-600/85">
+              <School className="h-3.5 w-3.5 shrink-0" />
               École
             </p>
-            <h1 className="mt-1 text-[1.85rem] font-black tracking-tight text-slate-900">
-              Salut {name}
-            </h1>
-            <p className="mt-1 text-sm font-medium text-slate-500">
-              Ton espace collège — clair, utile, sans blabla.
+            <h1 className="app-title mt-0.5 text-slate-900">Salut {name}</h1>
+            <p className="app-sub mt-0.5">
+              Ton collège — clair, utile, sans blabla.
             </p>
           </div>
           <button
@@ -96,7 +91,7 @@ export function EcoleHome() {
               void load();
             }}
             disabled={refreshing}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/70 bg-white/70 text-sky-700 shadow-sm active:scale-95 disabled:opacity-50"
+            className="app-icon-btn rounded-2xl border border-white/70 bg-white/75 text-sky-700 shadow-sm active:scale-95 disabled:opacity-50"
             aria-label="Actualiser"
           >
             <RefreshCw
@@ -108,23 +103,23 @@ export function EcoleHome() {
         {state.status === "ok" && state.data.mission && (
           <Link
             href="/devoirs"
-            className="relative mt-4 block rounded-2xl border border-sky-200/70 bg-gradient-to-r from-sky-50/90 to-white/70 px-3.5 py-3 active:scale-[0.99]"
+            className="app-card-tap relative mt-3 block rounded-2xl border border-sky-200/70 bg-gradient-to-r from-sky-50/95 to-white/75 px-3 py-2.5"
           >
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-sky-600">
-              Mission du moment
+            <p className="text-[0.625rem] font-bold uppercase tracking-[0.14em] text-sky-600">
+              Mission
               {state.data.mission.interrogation ? " · Éval" : ""}
             </p>
-            <p className="mt-1 text-[15px] font-bold leading-snug text-slate-900">
+            <p className="app-line-clamp-2 mt-1 text-[0.9375rem] font-bold leading-snug text-slate-900">
               {state.data.mission.matiere} — {state.data.mission.title}
             </p>
-            <p className="mt-1 text-xs font-medium text-slate-500">
+            <p className="mt-1 text-[0.75rem] font-medium text-slate-500">
               Pour {formatHomeworkDay(state.data.mission.date)}
             </p>
           </Link>
         )}
 
         {state.status === "ok" && (
-          <div className="relative mt-3 grid grid-cols-3 gap-2">
+          <div className="relative mt-2.5 grid grid-cols-3 gap-1.5">
             {[
               {
                 n: state.data.stats.devoirsRestants,
@@ -140,10 +135,12 @@ export function EcoleHome() {
             ].map((s) => (
               <div
                 key={s.l}
-                className="rounded-2xl border border-white/70 bg-white/55 px-2 py-2.5 text-center"
+                className="rounded-2xl border border-white/70 bg-white/60 px-1.5 py-2 text-center"
               >
-                <p className="text-lg font-black text-slate-900">{s.n}</p>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                <p className="truncate text-base font-black tabular-nums text-slate-900 sm:text-lg">
+                  {s.n}
+                </p>
+                <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-slate-400">
                   {s.l}
                 </p>
               </div>
@@ -154,20 +151,20 @@ export function EcoleHome() {
 
       <AnimatePresence mode="wait">
         {state.status === "loading" && (
-          <p className="mt-4 rounded-3xl border border-white/60 bg-white/55 px-4 py-5 text-sm font-medium text-slate-600 backdrop-blur-xl">
+          <p className="mt-3 rounded-3xl border border-white/60 bg-white/55 px-3.5 py-4 text-sm font-medium text-slate-600 backdrop-blur-xl">
             Préparation de ton espace école…
           </p>
         )}
 
         {state.status === "qcm" && (
-          <div className="mt-4 rounded-3xl border border-amber-200 bg-amber-50/90 px-4 py-4 text-sm text-amber-950">
+          <div className="mt-3 rounded-3xl border border-amber-200 bg-amber-50/95 px-3.5 py-3.5 text-sm text-amber-950">
             <p className="font-bold">Connexion sécurité requise</p>
-            <p className="mt-1 text-amber-900/80">
-              Ouvre Devoirs une fois pour répondre au QCM, puis reviens ici.
+            <p className="mt-1 text-[0.8125rem] leading-snug text-amber-900/80">
+              Ouvre Devoirs une fois pour le QCM, puis reviens ici.
             </p>
             <Link
               href="/devoirs"
-              className="mt-3 inline-flex rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white"
+              className="app-btn mt-3 inline-flex items-center justify-center rounded-xl bg-amber-600 px-4 text-sm font-bold text-white"
             >
               Aller aux devoirs
             </Link>
@@ -175,10 +172,10 @@ export function EcoleHome() {
         )}
 
         {state.status === "error" && (
-          <div className="mt-4 rounded-3xl border border-rose-200 bg-rose-50/90 px-4 py-4 text-sm text-rose-950">
+          <div className="mt-3 rounded-3xl border border-rose-200 bg-rose-50/95 px-3.5 py-3.5 text-sm text-rose-950">
             <p className="font-bold">Pas de synchro pour l’instant</p>
-            <p className="mt-1">{state.message}</p>
-            <p className="mt-2 text-rose-800/80">
+            <p className="mt-1 break-words text-[0.8125rem]">{state.message}</p>
+            <p className="mt-2 text-[0.8125rem] text-rose-800/80">
               Tu peux quand même ouvrir les outils ci-dessous.
             </p>
           </div>
@@ -186,68 +183,66 @@ export function EcoleHome() {
       </AnimatePresence>
 
       {state.status === "ok" && state.data.prochainesEvals.length > 0 && (
-        <section className="mt-5">
-          <h2 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-wide text-slate-500">
-            À préparer
-          </h2>
-          <div className="space-y-2">
+        <section className="mt-4">
+          <h2 className="app-section-label mb-1.5 px-0.5">À préparer</h2>
+          <div className="space-y-1.5">
             {state.data.prochainesEvals.map((e) => (
               <Link
                 key={e.id}
                 href="/devoirs"
-                className={`flex items-center gap-3 px-3.5 py-3 ${GLASS.panel}`}
+                className={`app-card-tap flex min-h-12 items-center gap-2.5 px-3 py-2.5 ${GLASS.panel}`}
               >
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500 text-xs font-black text-white">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-500 text-[0.65rem] font-black text-white">
                   Éval
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-bold text-slate-900">
                     {e.matiere}
                   </span>
-                  <span className="block truncate text-xs text-slate-500">
+                  <span className="block truncate text-[0.75rem] text-slate-500">
                     {formatHomeworkDay(e.date)}
                   </span>
                 </span>
-                <ChevronRight className="h-5 w-5 text-slate-300" />
+                <ChevronRight className="h-5 w-5 shrink-0 text-slate-300" />
               </Link>
             ))}
           </div>
         </section>
       )}
 
-      <section className="mt-6">
-        <h2 className="mb-2 px-1 text-[13px] font-bold uppercase tracking-wide text-slate-500">
-          Tes outils
-        </h2>
-        <div className="grid grid-cols-2 gap-2.5">
+      <section className="mt-4">
+        <h2 className="app-section-label mb-1.5 px-0.5">Tes outils</h2>
+        <div className="grid grid-cols-2 gap-2">
           {ECOLE_MODULES.filter((m) => m.id !== "astuce").map((mod, i) => {
             const tone = moduleTone(mod.tone);
             const Icon = mod.icon;
             return (
               <motion.div
                 key={mod.id}
-                initial={{ opacity: 0, y: 12 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.04 * i }}
+                transition={{ delay: 0.03 * i }}
               >
                 <Link
                   href={mod.href}
-                  className={`block h-full overflow-hidden rounded-3xl border border-white/60 bg-gradient-to-br ${tone.soft} p-3.5 shadow-lg shadow-slate-900/8 ring-1 ${tone.ring} backdrop-blur-xl active:scale-[0.98]`}
+                  className={`app-card-tap block h-full min-h-[6.75rem] overflow-hidden rounded-[1.35rem] border border-white/60 bg-gradient-to-br ${tone.soft} p-3 shadow-lg shadow-slate-900/8 ring-1 ${tone.ring} backdrop-blur-xl`}
                 >
-                  <span
-                    className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${tone.icon} text-white shadow-md`}
-                  >
-                    <Icon className="h-5 w-5" strokeWidth={2.4} />
-                  </span>
-                  {mod.badge && (
-                    <span className="ml-2 align-middle text-[10px] font-bold uppercase tracking-wide text-rose-600">
-                      {mod.badge}
+                  <div className="flex items-start justify-between gap-1">
+                    <span
+                      className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br ${tone.icon} text-white shadow-md`}
+                    >
+                      <Icon className="h-[1.15rem] w-[1.15rem]" strokeWidth={2.4} />
                     </span>
-                  )}
-                  <p className="mt-3 text-[15px] font-black text-slate-900">
+                    {mod.badge && (
+                      <span className="rounded-full bg-rose-500/10 px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wide text-rose-600">
+                        {mod.badge}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2.5 text-[0.9375rem] font-black leading-tight text-slate-900">
                     {mod.label}
                   </p>
-                  <p className="mt-0.5 text-xs font-medium leading-snug text-slate-500">
+                  <p className="app-line-clamp-2 mt-0.5 text-[0.6875rem] font-medium leading-snug text-slate-500">
                     {mod.blurb}
                   </p>
                 </Link>
@@ -257,22 +252,22 @@ export function EcoleHome() {
         </div>
       </section>
 
-      <section className={`mt-5 px-4 py-4 ${GLASS.panel}`}>
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600/80">
+      <section className={`mt-3.5 px-3.5 py-3.5 ${GLASS.panel}`}>
+        <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-indigo-600/80">
           Astuce du jour
         </p>
-        <p className="mt-1.5 text-sm font-semibold leading-relaxed text-slate-800">
+        <p className="mt-1.5 text-[0.875rem] font-semibold leading-relaxed text-slate-800">
           {TIP_OF_DAY()}
         </p>
         <Link
           href="/ecole/focus"
-          className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-sky-700"
+          className="app-btn mt-2.5 inline-flex items-center gap-1 text-sm font-bold text-sky-700"
         >
           Lancer un focus 15 min
           <ChevronRight className="h-4 w-4" />
         </Link>
       </section>
-    </div>
+    </MobileScreen>
   );
 }
 

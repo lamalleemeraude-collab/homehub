@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Pause, Play, RotateCcw } from "lucide-react";
 import { GLASS } from "@/lib/ui/pastel-theme";
+import { MobileScreen } from "@/components/mobile/MobileScreen";
 
 const PRESETS = [
   { label: "10 min", seconds: 10 * 60 },
@@ -64,24 +65,20 @@ export function FocusTimer() {
   const ratio = total > 0 ? left / total : 0;
 
   return (
-    <div className="mx-auto w-full max-w-lg px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
-      <header className={`px-4 py-4 ${GLASS.panel}`}>
+    <MobileScreen>
+      <header className={`px-3.5 py-3.5 ${GLASS.panel}`}>
         <Link
           href="/ecole"
-          className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[0.14em] text-sky-600"
+          className="app-btn inline-flex items-center gap-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-sky-600"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           École
         </Link>
-        <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
-          Focus
-        </h1>
-        <p className="mt-0.5 text-sm font-medium text-slate-500">
-          Un créneau court, une méthode claire.
-        </p>
+        <h1 className="app-title mt-0.5 text-slate-900">Focus</h1>
+        <p className="app-sub mt-0.5">Un créneau court, une méthode claire.</p>
       </header>
 
-      <div className="mt-3 flex gap-2">
+      <div className="mt-2.5 flex gap-1.5">
         {PRESETS.map((p) => (
           <button
             key={p.label}
@@ -92,7 +89,7 @@ export function FocusTimer() {
               setLeft(p.seconds);
               setStep(0);
             }}
-            className={`flex-1 rounded-2xl border px-2 py-2.5 text-sm font-bold transition ${
+            className={`app-btn flex-1 rounded-2xl border px-1.5 text-[0.8125rem] font-bold transition ${
               total === p.seconds
                 ? "border-amber-300 bg-amber-50 text-amber-900"
                 : "border-white/60 bg-white/50 text-slate-600"
@@ -104,10 +101,10 @@ export function FocusTimer() {
       </div>
 
       <motion.div
-        className={`relative mt-4 flex flex-col items-center px-4 py-8 ${GLASS.panel}`}
-        animate={{ scale: running ? 1 : 0.99 }}
+        className={`relative mt-3 flex flex-col items-center px-3 py-6 sm:py-8 ${GLASS.panel}`}
+        animate={{ scale: running ? 1 : 0.995 }}
       >
-        <div className="relative flex h-44 w-44 items-center justify-center">
+        <div className="relative flex h-[9.5rem] w-[9.5rem] items-center justify-center sm:h-44 sm:w-44">
           <svg className="absolute inset-0 -rotate-90" viewBox="0 0 120 120">
             <circle
               cx="60"
@@ -136,18 +133,18 @@ export function FocusTimer() {
               </linearGradient>
             </defs>
           </svg>
-          <p className="text-4xl font-black tabular-nums text-slate-900">
+          <p className="text-[2.15rem] font-black tabular-nums text-slate-900 sm:text-4xl">
             {format(left)}
           </p>
         </div>
 
-        <p className="mt-2 text-center text-sm font-semibold text-slate-700">
+        <p className="mt-2 max-w-[18rem] px-1 text-center text-[0.8125rem] font-semibold leading-snug text-slate-700 sm:text-sm">
           {left === 0
             ? "Terminé — pause 3 min, sans écran."
             : STEPS[step]}
         </p>
 
-        <div className="mt-5 flex items-center gap-3">
+        <div className="mt-4 flex w-full max-w-xs items-center justify-center gap-2.5">
           <button
             type="button"
             onClick={() => {
@@ -155,7 +152,7 @@ export function FocusTimer() {
               setLeft(total);
               setStep(0);
             }}
-            className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/70 bg-white/70 text-slate-600"
+            className="app-icon-btn rounded-2xl border border-white/70 bg-white/75 text-slate-600"
             aria-label="Réinitialiser"
           >
             <RotateCcw className="h-5 w-5" />
@@ -164,7 +161,7 @@ export function FocusTimer() {
             type="button"
             onClick={() => setRunning((v) => !v)}
             disabled={left === 0}
-            className="flex h-14 items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-6 text-base font-black text-white shadow-lg shadow-amber-300/40 active:scale-95 disabled:opacity-40"
+            className="app-btn flex min-h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 text-base font-black text-white shadow-lg shadow-amber-300/40 active:scale-95 disabled:opacity-40"
           >
             {running ? (
               <>
@@ -172,7 +169,8 @@ export function FocusTimer() {
               </>
             ) : (
               <>
-                <Play className="h-5 w-5" /> {left === total ? "Go" : "Reprendre"}
+                <Play className="h-5 w-5" />{" "}
+                {left === total ? "Go" : "Reprendre"}
               </>
             )}
           </button>
@@ -181,10 +179,10 @@ export function FocusTimer() {
 
       <Link
         href="/devoirs"
-        className={`mt-3 block px-4 py-3.5 text-center text-sm font-bold text-sky-800 ${GLASS.panel}`}
+        className={`app-card-tap app-btn mt-2.5 flex items-center justify-center px-3.5 text-center text-sm font-bold text-sky-800 ${GLASS.panel}`}
       >
         Ouvrir les devoirs pendant le focus
       </Link>
-    </div>
+    </MobileScreen>
   );
 }

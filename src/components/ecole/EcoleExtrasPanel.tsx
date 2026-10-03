@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { GLASS } from "@/lib/ui/pastel-theme";
+import { MobileScreen } from "@/components/mobile/MobileScreen";
 
 type Scope = "notes" | "edt" | "vie";
 
@@ -65,23 +66,19 @@ export function EcoleExtrasPanel({
   }, [load]);
 
   return (
-    <div className="mx-auto w-full max-w-lg px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
-      <header className={`px-4 py-4 ${GLASS.panel}`}>
-        <div className="flex items-start justify-between gap-3">
+    <MobileScreen>
+      <header className={`px-3.5 py-3.5 ${GLASS.panel}`}>
+        <div className="flex items-start justify-between gap-2.5">
           <div className="min-w-0">
             <Link
               href="/ecole"
-              className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-[0.14em] text-sky-600"
+              className="app-btn inline-flex items-center gap-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-sky-600"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               École
             </Link>
-            <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
-              {title}
-            </h1>
-            <p className="mt-0.5 text-sm font-medium text-slate-500">
-              {subtitle}
-            </p>
+            <h1 className="app-title mt-0.5 text-slate-900">{title}</h1>
+            <p className="app-sub mt-0.5">{subtitle}</p>
           </div>
           <button
             type="button"
@@ -90,7 +87,7 @@ export function EcoleExtrasPanel({
               void load();
             }}
             disabled={refreshing}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/70 bg-white/70 text-sky-700 shadow-sm active:scale-95 disabled:opacity-50"
+            className="app-icon-btn rounded-2xl border border-white/70 bg-white/75 text-sky-700 shadow-sm active:scale-95 disabled:opacity-50"
             aria-label="Actualiser"
           >
             <RefreshCw
@@ -101,20 +98,20 @@ export function EcoleExtrasPanel({
       </header>
 
       {state.status === "loading" && (
-        <p className="mt-4 rounded-3xl border border-white/60 bg-white/55 px-4 py-5 text-sm font-medium text-slate-600">
+        <p className="mt-3 rounded-3xl border border-white/60 bg-white/55 px-3.5 py-4 text-sm font-medium text-slate-600">
           Chargement…
         </p>
       )}
 
       {state.status === "qcm" && (
-        <div className="mt-4 rounded-3xl border border-amber-200 bg-amber-50/90 px-4 py-4 text-sm text-amber-950">
+        <div className="mt-3 rounded-3xl border border-amber-200 bg-amber-50/95 px-3.5 py-3.5 text-sm text-amber-950">
           <p className="font-bold">Connexion sécurité requise</p>
-          <p className="mt-1 text-amber-900/80">
+          <p className="mt-1 text-[0.8125rem] text-amber-900/80">
             Ouvre Devoirs une fois pour le QCM, puis reviens.
           </p>
           <Link
             href="/devoirs"
-            className="mt-3 inline-flex rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white"
+            className="app-btn mt-3 inline-flex items-center justify-center rounded-xl bg-amber-600 px-4 text-sm font-bold text-white"
           >
             Aller aux devoirs
           </Link>
@@ -122,15 +119,15 @@ export function EcoleExtrasPanel({
       )}
 
       {state.status === "error" && (
-        <div className="mt-4 rounded-3xl border border-rose-200 bg-rose-50/90 px-4 py-4 text-sm text-rose-950">
+        <div className="mt-3 rounded-3xl border border-rose-200 bg-rose-50/95 px-3.5 py-3.5 text-sm text-rose-950">
           <p className="font-bold">Pas de données</p>
-          <p className="mt-1">{state.message}</p>
+          <p className="mt-1 break-words text-[0.8125rem]">{state.message}</p>
         </div>
       )}
 
       {state.status === "ok" && (
-        <div className="mt-4 space-y-2">{children(state.data)}</div>
+        <div className="mt-3 space-y-1.5">{children(state.data)}</div>
       )}
-    </div>
+    </MobileScreen>
   );
 }

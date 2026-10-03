@@ -137,6 +137,188 @@ body {
   min-width: var(--kiosk-touch-min);
 }
 
+/* ——— App mobile-first (École / Révisions / iPhone) ——— */
+.mobile-app {
+  --app-gutter: 0.875rem;
+  --app-nav-bar: 3.75rem;
+  --app-nav-gap: 0.5rem;
+  --app-bottom-clearance: calc(
+    var(--app-nav-bar) + var(--app-nav-gap) + 0.75rem +
+      env(safe-area-inset-bottom, 0px)
+  );
+  --app-title: clamp(1.35rem, 6.2vw, 1.75rem);
+  --app-body: 0.9375rem;
+  position: relative;
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  color: rgb(15 23 42);
+  background:
+    radial-gradient(120% 80% at 10% -10%, rgb(186 230 253 / 0.55), transparent 55%),
+    radial-gradient(90% 60% at 100% 0%, rgb(167 243 208 / 0.28), transparent 50%),
+    linear-gradient(165deg, #e8eef8 0%, #eef4fb 45%, #f3f0fa 100%);
+}
+
+.mobile-app__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: var(--app-bottom-clearance);
+  scroll-padding-bottom: var(--app-bottom-clearance);
+}
+
+.mobile-screen {
+  box-sizing: border-box;
+  width: 100%;
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+  padding-left: max(var(--app-gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--app-gutter), env(safe-area-inset-right, 0px));
+  padding-bottom: 0.5rem;
+}
+
+.mobile-screen--tight {
+  padding-top: max(0.35rem, env(safe-area-inset-top, 0px));
+}
+
+.mobile-app .app-title {
+  font-size: var(--app-title);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 900;
+}
+
+.mobile-app .app-sub {
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  font-weight: 500;
+  color: rgb(100 116 139);
+}
+
+.mobile-app .app-section-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(100 116 139);
+}
+
+.mobile-app .app-btn {
+  min-height: 2.75rem;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.mobile-app .app-icon-btn {
+  display: inline-flex;
+  height: 2.75rem;
+  width: 2.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+
+.mobile-app .app-input {
+  font-size: 1rem; /* iOS: évite le zoom auto */
+  min-height: 2.75rem;
+  border-radius: 0.875rem;
+}
+
+.mobile-app .app-card-tap {
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+  transition: transform 120ms ease-out;
+}
+
+.mobile-app .app-card-tap:active {
+  transform: scale(0.985);
+}
+
+.mobile-app .app-line-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.mobile-bottom-nav {
+  pointer-events: none;
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 50;
+  padding-left: max(0.625rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.625rem, env(safe-area-inset-right, 0px));
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+.mobile-bottom-nav__bar {
+  pointer-events: auto;
+  display: flex;
+  align-items: stretch;
+  gap: 0.125rem;
+  height: var(--app-nav-bar);
+  max-width: 26.5rem;
+  margin-inline: auto;
+  padding: 0.25rem;
+  border-radius: 1.35rem;
+  border: 1px solid rgb(255 255 255 / 0.55);
+  background: rgb(255 255 255 / 0.72);
+  box-shadow:
+    0 10px 36px rgb(15 23 42 / 0.14),
+    0 1px 0 rgb(255 255 255 / 0.8) inset;
+  backdrop-filter: blur(22px) saturate(1.4);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+}
+
+.mobile-bottom-nav__item {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  border-radius: 1.1rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@media (min-width: 390px) {
+  .mobile-app {
+    --app-gutter: 1rem;
+  }
+
+  .mobile-bottom-nav__item {
+    font-size: 0.6875rem;
+  }
+}
+
+@media (min-width: 480px) {
+  .mobile-app {
+    --app-gutter: 1.15rem;
+  }
+
+  .mobile-screen {
+    max-width: 28rem;
+  }
+}
+
 /* ——— Calendrier mensuel (bento grid) ——— */
 .cal-month-grid {
   flex: 1 1 auto;

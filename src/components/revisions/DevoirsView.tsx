@@ -17,6 +17,7 @@ import {
   subjectStyle,
 } from "@/lib/ecoledirecte/subjects";
 import { GLASS } from "@/lib/ui/pastel-theme";
+import { MobileScreen } from "@/components/mobile/MobileScreen";
 
 function firstName(eleve: string): string {
   return eleve.trim().split(/\s+/)[0] || "Maelle";
@@ -32,40 +33,40 @@ function DevoirCard({
   const [open, setOpen] = useState(item.interrogation || index < 2);
   const style = subjectStyle(item.matiere);
   const collapsed =
-    !open && item.contenu.length > 110
-      ? `${item.contenu.slice(0, 110).trim()}…`
+    !open && item.contenu.length > 90
+      ? `${item.contenu.slice(0, 90).trim()}…`
       : item.contenu;
 
   return (
     <motion.article
       layout
-      initial={{ opacity: 0, y: 14 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: Math.min(index * 0.04, 0.24), duration: 0.35 }}
+      transition={{ delay: Math.min(index * 0.03, 0.2), duration: 0.3 }}
       className={`overflow-hidden ${GLASS.panel}`}
     >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-stretch gap-0 text-left"
+        className="app-card-tap flex min-h-12 w-full items-stretch gap-0 text-left"
       >
         <span
           className={`w-1.5 shrink-0 bg-gradient-to-b ${style.bar}`}
           aria-hidden
         />
         <span
-          className={`min-w-0 flex-1 bg-gradient-to-br ${style.soft} px-3.5 py-3.5`}
+          className={`min-w-0 flex-1 bg-gradient-to-br ${style.soft} px-3 py-3`}
         >
           <span className="flex items-start justify-between gap-2">
             <span
-              className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${style.chip}`}
+              className={`inline-flex max-w-[55%] truncate rounded-full px-2 py-0.5 text-[0.6875rem] font-bold tracking-wide ${style.chip}`}
             >
               {style.short}
             </span>
-            <span className="flex items-center gap-1.5">
+            <span className="flex shrink-0 items-center gap-1">
               {item.interrogation && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm shadow-rose-300/50">
-                  <AlertTriangle className="h-3 w-3" strokeWidth={2.5} />
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-rose-500 px-1.5 py-0.5 text-[0.5625rem] font-bold uppercase tracking-wide text-white">
+                  <AlertTriangle className="h-2.5 w-2.5" strokeWidth={2.5} />
                   Éval
                 </span>
               )}
@@ -82,7 +83,7 @@ function DevoirCard({
           </span>
 
           <p
-            className={`mt-2 whitespace-pre-wrap text-[15px] font-semibold leading-snug text-slate-900 ${
+            className={`mt-1.5 whitespace-pre-wrap text-[0.9375rem] font-semibold leading-snug text-slate-900 ${
               item.fait ? "line-through opacity-55" : ""
             }`}
           >
@@ -95,7 +96,7 @@ function DevoirCard({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="mt-3 text-xs font-medium text-slate-400"
+                className="mt-2 text-[0.75rem] font-medium text-slate-400"
               >
                 {item.prof ? `${item.prof}` : "Prof"}
                 {item.donneLe ? ` · donné le ${item.donneLe}` : ""}
@@ -134,28 +135,28 @@ export function DevoirsView({
   let cardIndex = 0;
 
   return (
-    <div className="mx-auto w-full max-w-lg px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
+    <MobileScreen>
       <motion.header
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`relative overflow-hidden px-5 py-5 ${GLASS.panel}`}
+        className={`relative overflow-hidden px-3.5 py-3.5 ${GLASS.panel}`}
       >
-        <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-sky-300/25 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-10 left-10 h-28 w-28 rounded-full bg-indigo-300/20 blur-2xl" />
+        <div className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-sky-300/25 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-10 left-10 h-24 w-24 rounded-full bg-indigo-300/20 blur-2xl" />
 
-        <div className="relative flex items-start justify-between gap-3">
-          <div>
+        <div className="relative flex items-start justify-between gap-2.5">
+          <div className="min-w-0 flex-1">
             <Link
               href="/ecole"
-              className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-600/80"
+              className="app-btn inline-flex items-center gap-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-sky-600/85"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               École
             </Link>
-            <h1 className="mt-1 text-[1.75rem] font-black tracking-tight text-slate-900">
+            <h1 className="app-title mt-0.5 text-slate-900">
               Devoirs · {name}
             </h1>
-            <p className="mt-1 text-sm font-medium text-slate-500">
+            <p className="app-sub mt-0.5">
               {todo.length === 0
                 ? "Rien à faire — bien joué !"
                 : `${todo.length} devoir${todo.length > 1 ? "s" : ""} à faire`}
@@ -168,7 +169,7 @@ export function DevoirsView({
             type="button"
             onClick={onRefresh}
             disabled={refreshing}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/70 bg-white/70 text-sky-700 shadow-sm active:scale-95 disabled:opacity-50"
+            className="app-icon-btn rounded-2xl border border-white/70 bg-white/75 text-sky-700 shadow-sm active:scale-95 disabled:opacity-50"
             aria-label="Actualiser"
           >
             <RefreshCw
@@ -179,11 +180,10 @@ export function DevoirsView({
         </div>
 
         {evals.length > 0 && (
-          <div className="relative mt-4 flex items-center gap-2 rounded-2xl border border-rose-200/70 bg-rose-50/90 px-3 py-2.5">
+          <div className="relative mt-2.5 flex items-center gap-2 rounded-2xl border border-rose-200/70 bg-rose-50/90 px-2.5 py-2">
             <Sparkles className="h-4 w-4 shrink-0 text-rose-500" />
-            <p className="text-xs font-semibold text-rose-900">
-              Prochaine éval :{" "}
-              {subjectStyle(evals[0].matiere).short}
+            <p className="min-w-0 text-[0.75rem] font-semibold leading-snug text-rose-900">
+              Prochaine éval : {subjectStyle(evals[0].matiere).short}
               {" · "}
               {formatHomeworkDay(evals[0].date).split("·")[0].trim()}
             </p>
@@ -191,13 +191,13 @@ export function DevoirsView({
         )}
       </motion.header>
 
-      <div className="mt-5 space-y-6">
+      <div className="mt-3.5 space-y-4">
         {groups.map(([date, items]) => (
           <section key={date}>
-            <h2 className="sticky top-0 z-10 mb-2.5 bg-gradient-to-b from-[#e8eef8]/95 via-[#e8eef8]/85 to-transparent px-1 pb-2 pt-1 text-[13px] font-bold capitalize tracking-wide text-slate-600 backdrop-blur-sm">
+            <h2 className="app-section-label sticky top-0 z-10 mb-1.5 bg-gradient-to-b from-[#e8eef8] via-[#e8eef8]/92 to-transparent px-0.5 pb-1.5 pt-0.5 backdrop-blur-[2px]">
               {formatHomeworkDay(date)}
             </h2>
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {items.map((item) => {
                 const i = cardIndex++;
                 return <DevoirCard key={item.id} item={item} index={i} />;
@@ -206,6 +206,6 @@ export function DevoirsView({
           </section>
         ))}
       </div>
-    </div>
+    </MobileScreen>
   );
 }

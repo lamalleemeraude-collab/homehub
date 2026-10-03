@@ -1,7 +1,10 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { DevoirsView } from "@/components/revisions/DevoirsView";
+import { MobileScreen } from "@/components/mobile/MobileScreen";
 import type {
   HomeworkErrorResponse,
   HomeworkResponse,
@@ -195,18 +198,20 @@ export default function DevoirsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-lg px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
-      <header className="mb-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-600/80">
-          Révisions
-        </p>
-        <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900">
-          Devoirs
-        </h1>
+    <MobileScreen>
+      <header className="mb-3.5">
+        <Link
+          href="/ecole"
+          className="app-btn inline-flex items-center gap-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-sky-600/85"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          École
+        </Link>
+        <h1 className="app-title mt-0.5 text-slate-900">Devoirs</h1>
       </header>
 
       {(state.status === "loading" || state.status === "idle") && (
-        <p className="rounded-3xl border border-white/60 bg-white/55 px-4 py-5 text-sm font-medium text-slate-600 shadow-xl shadow-slate-900/10 backdrop-blur-2xl">
+        <p className="rounded-3xl border border-white/60 bg-white/55 px-3.5 py-4 text-sm font-medium text-slate-600 shadow-xl shadow-slate-900/10 backdrop-blur-2xl">
           Chargement des devoirs…
         </p>
       )}
@@ -214,25 +219,25 @@ export default function DevoirsPage() {
       {showLoginForm && (
         <form
           onSubmit={onSubmit}
-          className="mb-4 space-y-3 rounded-3xl border border-sky-200/70 bg-white/70 px-4 py-5 shadow-xl shadow-slate-900/10 backdrop-blur-2xl"
+          className="mb-3 space-y-3 rounded-3xl border border-sky-200/70 bg-white/75 px-3.5 py-4 shadow-xl shadow-slate-900/10 backdrop-blur-2xl"
         >
           <p className="text-sm font-bold text-slate-900">
             Connexion ÉcoleDirecte
           </p>
           <label className="block space-y-1">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-slate-500">
               Identifiant
             </span>
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-sky-300 focus:ring-2"
+              className="app-input w-full border border-slate-200 bg-white px-3 text-slate-900 outline-none ring-sky-300 focus:ring-2"
               required
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-slate-500">
               Mot de passe {hasStoredPassword ? "(déjà enregistré)" : ""}
             </span>
             <input
@@ -243,7 +248,7 @@ export default function DevoirsPage() {
               placeholder={
                 hasStoredPassword ? "Laisser vide pour garder l’actuel" : ""
               }
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 outline-none ring-sky-300 focus:ring-2"
+              className="app-input w-full border border-slate-200 bg-white px-3 text-slate-900 outline-none ring-sky-300 focus:ring-2"
               required={!hasStoredPassword}
             />
           </label>
@@ -253,7 +258,7 @@ export default function DevoirsPage() {
           <button
             type="submit"
             disabled={saving}
-            className="w-full rounded-xl bg-sky-600 px-4 py-3 text-sm font-bold text-white shadow-md shadow-sky-300/40 active:opacity-90 disabled:opacity-60"
+            className="app-btn w-full rounded-xl bg-sky-600 px-4 text-sm font-bold text-white shadow-md shadow-sky-300/40 active:opacity-90 disabled:opacity-60"
           >
             {saving ? "Connexion…" : "Connexion"}
           </button>
@@ -261,17 +266,17 @@ export default function DevoirsPage() {
       )}
 
       {state.status === "qcm" && (
-        <div className="space-y-3 rounded-3xl border border-amber-200/80 bg-amber-50/90 px-4 py-5 shadow-xl shadow-slate-900/10 backdrop-blur-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
+        <div className="space-y-2.5 rounded-3xl border border-amber-200/80 bg-amber-50/95 px-3.5 py-4 shadow-xl shadow-slate-900/10 backdrop-blur-2xl">
+          <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-amber-700">
             Sécurité ÉcoleDirecte
           </p>
-          <p className="text-base font-bold text-slate-900">
+          <p className="text-[0.9375rem] font-bold leading-snug text-slate-900">
             {state.qcm.question}
           </p>
-          <p className="text-xs font-medium text-rose-700">
-            Une seule réponse — pas de double-clic.
+          <p className="text-[0.75rem] font-medium text-rose-700">
+            Une seule réponse — un seul tap.
           </p>
-          <div className="flex max-h-[50vh] flex-col gap-2 overflow-y-auto">
+          <div className="flex max-h-[min(50dvh,22rem)] flex-col gap-1.5 overflow-y-auto overscroll-contain">
             {state.qcm.propositions.map((prop, index) => (
               <button
                 key={`${prop}-${index}`}
@@ -280,7 +285,7 @@ export default function DevoirsPage() {
                 onClick={() =>
                   void answerQcm(state.qcm.propositionValues[index] ?? prop)
                 }
-                className="rounded-xl border border-amber-200/80 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-800 shadow-sm active:bg-amber-50 disabled:opacity-60"
+                className="app-btn rounded-xl border border-amber-200/80 bg-white px-3.5 text-left text-sm font-semibold text-slate-800 shadow-sm active:bg-amber-50 disabled:opacity-60"
               >
                 {prop}
               </button>
@@ -290,18 +295,18 @@ export default function DevoirsPage() {
       )}
 
       {state.status === "error" && !showLoginForm && (
-        <div className="space-y-3 rounded-3xl border border-rose-200/70 bg-rose-50/80 px-4 py-5 text-sm text-rose-950 shadow-xl backdrop-blur-2xl">
+        <div className="space-y-2.5 rounded-3xl border border-rose-200/70 bg-rose-50/90 px-3.5 py-4 text-sm text-rose-950 shadow-xl backdrop-blur-2xl">
           <p className="font-bold">Échec connexion</p>
-          <p>{state.data.error}</p>
+          <p className="break-words text-[0.8125rem]">{state.data.error}</p>
           <button
             type="button"
             onClick={() => void loadDevoirs()}
-            className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white"
+            className="app-btn rounded-xl bg-rose-600 px-4 text-sm font-bold text-white"
           >
             Réessayer une fois
           </button>
         </div>
       )}
-    </div>
+    </MobileScreen>
   );
 }
