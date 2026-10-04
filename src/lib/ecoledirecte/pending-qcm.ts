@@ -1,21 +1,20 @@
-import { deflateSync, inflateSync } from "zlib";
 import { mkdir, readFile, unlink, writeFile } from "fs/promises";
 import path from "path";
+import { gunzipSync, gzipSync } from "zlib";
 import { cookies } from "next/headers";
-import type { EdCredentials } from "./credentials";
+import { isServerlessRuntime, type EdCredentials } from "./credentials";
 import type { EdQcmChallenge } from "./types";
-import {
-  edStoreDir,
-  isReadonlyFsError,
-  isServerlessRuntime,
-} from "./runtime-fs";
 
-const FILE_PATH = () => path.join(edStoreDir(), "ed-pending-qcm.json");
-const COOKIE_NAME = "ed_qcm";
-const MAX_COOKIE = 3500;
+const DATA_DIR = path.join(process.cwd(), "data");
+const STORE_PATH = path.join(DATA_DIR, "ed-pending-qcm.json");
+const COOKIE_NAME = "ed_pending_qcm";
+/** Cookies max ~4KB — on découpe si besoin. */
+const COOKIE_CHUNK = "ed_pq_";
+const MAX_CHUNK = 3500;
 
 export type PendingQcmStore = {
-  creds: EdCredentials;
+  /** Sans mot de passe en cookie (repris via env / fichier). */
+  creds: Omit<EdCredentials, "password"> & { password?: string };
   challenge: EdQcmChallenge;
   session: {
     cookies: Record<string, string>;
@@ -26,127 +25,90 @@ export type PendingQcmStore = {
   createdAt: number;
 };
 
-/** Payload cookie sans mot de passe (repris depuis l’env au restore). */
-type SlimPending = {
-  challenge: EdQcmChallenge;
-  session: PendingQcmStore["session"];
-  createdAt: number;
-  username: string;
-  studentName?: string;
-  uuid?: string;
-  cn?: string;
-  cv?: string;
-};
-
-function encodeSlim(data: PendingQcmStore): string {
-  const slim: SlimPending = {
-    challenge: data.challenge,
-    session: data.session,
-    createdAt: data.createdAt,
-    username: data.creds.username,
-    studentName: data.creds.studentName,
-    uuid: data.creds.uuid,
-    cn: data.creds.cn,
-    cv: data.creds.cv,
+function pack(data: PendingQcmStore): string {
+  const slim: PendingQcmStore = {
+    ...data,
+    creds: {
+      username: data.creds.username,
+      studentName: data.creds.studentName,
+      cn: data.creds.cn,
+      cv: data.creds.cv,
+      uuid: data.creds.uuid,
+      // jamais le password dans le cookie
+    },
   };
-  return deflateSync(Buffer.from(JSON.stringify(slim), "utf8")).toString(
+  return gzipSync(Buffer.from(JSON.stringify(slim), "utf8")).toString(
     "base64url"
   );
 }
 
-function decodeSlim(encoded: string): SlimPending | null {
-  try {
-    const json = inflateSync(
-      Buffer.from(encoded, "base64url")
-    ).toString("utf8");
-    return JSON.parse(json) as SlimPending;
-  } catch {
-    return null;
-  }
+function unpack(raw: string): PendingQcmStore {
+  const json = gunzipSync(Buffer.from(raw, "base64url")).toString("utf8");
+  return JSON.parse(json) as PendingQcmStore;
 }
 
-async function hydrateFromSlim(slim: SlimPending): Promise<PendingQcmStore | null> {
-  if (!slim?.challenge || Date.now() - slim.createdAt > 10 * 60 * 1000) {
-    return null;
-  }
-  const { resolveCredentials } = await import("./credentials");
-  const creds = await resolveCredentials({
-    cookieCn: slim.cn,
-    cookieCv: slim.cv,
-    cookieUuid: slim.uuid,
-  });
-  if (!creds) return null;
-  return {
-    challenge: slim.challenge,
-    session: slim.session,
-    createdAt: slim.createdAt,
-    creds: {
-      ...creds,
-      username: slim.username || creds.username,
-      studentName: slim.studentName || creds.studentName,
-      uuid: slim.uuid || creds.uuid,
-      cn: slim.cn || creds.cn,
-      cv: slim.cv || creds.cv,
-    },
-  };
-}
-
-async function saveCookie(data: PendingQcmStore): Promise<boolean> {
-  try {
-    const encoded = encodeSlim(data);
-    if (encoded.length > MAX_COOKIE) return false;
-    const jar = await cookies();
-    jar.set(COOKIE_NAME, encoded, {
-      path: "/",
-      maxAge: 10 * 60,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function readCookie(): Promise<PendingQcmStore | null> {
-  try {
-    const jar = await cookies();
-    const raw = jar.get(COOKIE_NAME)?.value;
-    if (!raw) return null;
-    const slim = decodeSlim(raw);
-    if (!slim) return null;
-    const pending = await hydrateFromSlim(slim);
-    if (!pending) {
-      await clearPendingQcm();
-      return null;
-    }
-    return pending;
-  } catch {
-    return null;
-  }
-}
-
-async function clearCookie(): Promise<void> {
+async function clearCookiePending(): Promise<void> {
   try {
     const jar = await cookies();
     jar.set(COOKIE_NAME, "", { path: "/", maxAge: 0 });
+    for (let i = 0; i < 8; i++) {
+      jar.set(`${COOKIE_CHUNK}${i}`, "", { path: "/", maxAge: 0 });
+    }
   } catch {
-    /* hors requête */
+    /* ignore */
   }
 }
 
-async function saveFile(data: PendingQcmStore): Promise<void> {
-  await mkdir(edStoreDir(), { recursive: true });
-  await writeFile(FILE_PATH(), JSON.stringify(data), "utf8");
+async function writeCookiePending(encoded: string): Promise<void> {
+  const jar = await cookies();
+  const opts = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: 10 * 60,
+  };
+
+  await clearCookiePending();
+
+  if (encoded.length <= MAX_CHUNK) {
+    jar.set(COOKIE_NAME, encoded, opts);
+    return;
+  }
+
+  const chunks = Math.ceil(encoded.length / MAX_CHUNK);
+  jar.set(COOKIE_NAME, `chunks:${chunks}`, opts);
+  for (let i = 0; i < chunks; i++) {
+    jar.set(
+      `${COOKIE_CHUNK}${i}`,
+      encoded.slice(i * MAX_CHUNK, (i + 1) * MAX_CHUNK),
+      opts
+    );
+  }
 }
 
-async function readFileStore(): Promise<PendingQcmStore | null> {
+async function readCookiePending(): Promise<PendingQcmStore | null> {
   try {
-    const raw = await readFile(FILE_PATH(), "utf8");
-    const parsed = JSON.parse(raw) as PendingQcmStore;
+    const jar = await cookies();
+    const head = jar.get(COOKIE_NAME)?.value;
+    if (!head) return null;
+
+    let encoded = head;
+    if (head.startsWith("chunks:")) {
+      const n = Number(head.slice("chunks:".length));
+      if (!Number.isFinite(n) || n < 1 || n > 8) return null;
+      const parts: string[] = [];
+      for (let i = 0; i < n; i++) {
+        const part = jar.get(`${COOKIE_CHUNK}${i}`)?.value;
+        if (!part) return null;
+        parts.push(part);
+      }
+      encoded = parts.join("");
+    }
+
+    const parsed = unpack(encoded);
     if (!parsed?.challenge || Date.now() - parsed.createdAt > 10 * 60 * 1000) {
-      await clearFile();
+      await clearCookiePending();
       return null;
     }
     return parsed;
@@ -155,32 +117,19 @@ async function readFileStore(): Promise<PendingQcmStore | null> {
   }
 }
 
-async function clearFile(): Promise<void> {
-  try {
-    await unlink(FILE_PATH());
-  } catch {
-    /* ignore */
-  }
-}
-
 export async function savePendingQcm(data: PendingQcmStore): Promise<void> {
   if (isServerlessRuntime()) {
-    const ok = await saveCookie(data);
-    if (ok) return;
-    // trop gros pour cookie → best-effort /tmp (même instance)
-    try {
-      await saveFile(data);
-    } catch (error) {
-      if (!isReadonlyFsError(error)) throw error;
-    }
+    await writeCookiePending(pack(data));
     return;
   }
 
   try {
-    await saveFile(data);
+    await mkdir(DATA_DIR, { recursive: true });
+    await writeFile(STORE_PATH, JSON.stringify(data), "utf8");
   } catch (error) {
-    if (isReadonlyFsError(error)) {
-      await saveCookie(data);
+    const err = error as NodeJS.ErrnoException;
+    if (err?.code === "EROFS" || err?.code === "EACCES") {
+      await writeCookiePending(pack(data));
       return;
     }
     throw error;
@@ -189,12 +138,29 @@ export async function savePendingQcm(data: PendingQcmStore): Promise<void> {
 
 export async function readPendingQcm(): Promise<PendingQcmStore | null> {
   if (isServerlessRuntime()) {
-    return (await readCookie()) || (await readFileStore());
+    return readCookiePending();
   }
-  return (await readFileStore()) || (await readCookie());
+
+  try {
+    const raw = await readFile(STORE_PATH, "utf8");
+    const parsed = JSON.parse(raw) as PendingQcmStore;
+    if (!parsed?.challenge || Date.now() - parsed.createdAt > 10 * 60 * 1000) {
+      await clearPendingQcm();
+      return null;
+    }
+    return parsed;
+  } catch {
+    // fichier absent → cookie (ex. FS déjà bloqué)
+    return readCookiePending();
+  }
 }
 
 export async function clearPendingQcm(): Promise<void> {
-  await clearCookie();
-  await clearFile();
+  await clearCookiePending();
+  if (isServerlessRuntime()) return;
+  try {
+    await unlink(STORE_PATH);
+  } catch {
+    // ignore
+  }
 }

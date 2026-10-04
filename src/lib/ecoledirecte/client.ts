@@ -382,7 +382,6 @@ async function attemptLogin(
   let uuid = creds.uuid;
   if (!uuid) {
     uuid = randomUUID();
-    creds.uuid = uuid;
     await writeStoredCredentials({ ...creds, uuid });
   }
 
@@ -467,12 +466,11 @@ async function attemptLogin(
 
 export async function answerQcmAndLogin(
   choix: string,
-  cookieFa?: { cn?: string; cv?: string; uuid?: string }
+  cookieFa?: { cn?: string; cv?: string }
 ): Promise<{
   eleve: string;
   devoirs: HomeworkItem[];
   fa?: { cn: string; cv: string };
-  uuid?: string;
 }> {
   const pending = await readPendingQcm();
   if (!pending) {
@@ -517,8 +515,24 @@ export async function answerQcmAndLogin(
 
   const cn = answerRes.data.cn;
   const cv = answerRes.data.cv;
-  void cookieFa;
-  const creds = { ...pending.creds, cn, cv };
+  const resolved = await resolveCredentials({
+    cookieCn: cookieFa?.cn,
+    cookieCv: cookieFa?.cv,
+  });
+  const creds: EdCredentials = {
+    username: pending.creds.username || resolved?.username || "",
+    password: pending.creds.password || resolved?.password || "",
+    studentName: pending.creds.studentName || resolved?.studentName,
+    uuid: pending.creds.uuid || resolved?.uuid,
+    cn,
+    cv,
+  };
+  if (!creds.username || !creds.password) {
+    throw Object.assign(
+      new Error("Identifiants manquants après le QCM."),
+      { code: 503 }
+    );
+  }
   await writeStoredCredentials(creds);
   await clearPendingQcm();
 
@@ -542,30 +556,19 @@ export async function answerQcmAndLogin(
     finalLogin.accounts,
     creds.studentName
   );
-  return {
-    ...homework,
-    fa: { cn, cv },
-    uuid: creds.uuid,
-  };
+  return { ...homework, fa: { cn, cv } };
 }
 
 export async function fetchHomeworkList(cookieFa?: {
   cn?: string;
   cv?: string;
-  uuid?: string;
 }): Promise<
-  | {
-      eleve: string;
-      devoirs: HomeworkItem[];
-      clearFa?: boolean;
-      uuid?: string;
-    }
-  | { qcm: EdQcmChallenge; uuid?: string }
+  | { eleve: string; devoirs: HomeworkItem[]; clearFa?: boolean }
+  | { qcm: EdQcmChallenge }
 > {
   const creds = await resolveCredentials({
     cookieCn: cookieFa?.cn,
     cookieCv: cookieFa?.cv,
-    cookieUuid: cookieFa?.uuid,
   });
 
   if (!creds) {
@@ -589,16 +592,15 @@ export async function fetchHomeworkList(cookieFa?: {
       session: sessionToJson(result.session),
       createdAt: Date.now(),
     });
-    return { qcm: result.challenge, uuid: creds.uuid };
+    return { qcm: result.challenge };
   }
 
   await clearPendingQcm();
-  const homework = await fetchHomeworkWithSession(
+  return fetchHomeworkWithSession(
     result.session,
     result.accounts,
     creds.studentName
   );
-  return { ...homework, uuid: creds.uuid };
 }
 
 async function fetchUpcoming(

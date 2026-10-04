@@ -1,12 +1,10 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
-import {
-  edStoreDir,
-  isReadonlyFsError,
-  isServerlessRuntime,
-} from "./runtime-fs";
+import { cookies } from "next/headers";
 
-const STORE_PATH = () => path.join(edStoreDir(), "ed-credentials.json");
+const DATA_DIR = path.join(process.cwd(), "data");
+const STORE_PATH = path.join(DATA_DIR, "ed-credentials.json");
+const UUID_COOKIE = "ed_device_uuid";
 
 export type EdCredentials = {
   username: string;
@@ -18,17 +16,51 @@ export type EdCredentials = {
   uuid?: string;
 };
 
+/** Vercel / Lambda : FS en lecture seule (sauf /tmp). */
+export function isServerlessRuntime(): boolean {
+  return Boolean(
+    process.env.VERCEL ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      process.env.VERCEL_ENV
+  );
+}
+
 function cleanEnv(value?: string | null): string {
   return (value ?? "").replace(/^\uFEFF/, "").trim();
 }
 
-async function ensureStoreDir(): Promise<void> {
-  await mkdir(edStoreDir(), { recursive: true });
+async function ensureDataDir(): Promise<void> {
+  await mkdir(DATA_DIR, { recursive: true });
+}
+
+async function readUuidCookie(): Promise<string | undefined> {
+  try {
+    const jar = await cookies();
+    return jar.get(UUID_COOKIE)?.value?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function writeUuidCookie(uuid: string): Promise<void> {
+  try {
+    const jar = await cookies();
+    jar.set(UUID_COOKIE, uuid, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  } catch {
+    // hors contexte request
+  }
 }
 
 export async function readStoredCredentials(): Promise<EdCredentials | null> {
+  if (isServerlessRuntime()) return null;
   try {
-    const raw = await readFile(STORE_PATH(), "utf8");
+    const raw = await readFile(STORE_PATH, "utf8");
     const parsed = JSON.parse(raw) as Partial<EdCredentials>;
     const username = parsed.username?.trim() ?? "";
     const password = parsed.password?.trim() ?? "";
@@ -47,15 +79,23 @@ export async function readStoredCredentials(): Promise<EdCredentials | null> {
 }
 
 /**
- * Persistance locale / best-effort.
- * Sur Vercel : écrit dans `/tmp` si possible, sinon no-op (jamais d’EROFS).
- * Identifiants prod = variables d’env ; uuid/FA = cookies.
+ * Persiste uuid / FA localement (fichier).
+ * Sur Vercel : uuid → cookie ; mot de passe uniquement via env (jamais de fichier).
  */
 export async function writeStoredCredentials(
   creds: EdCredentials
 ): Promise<void> {
+  if (creds.uuid?.trim()) {
+    await writeUuidCookie(creds.uuid.trim());
+  }
+
+  if (isServerlessRuntime()) {
+    // Prod : ED_USERNAME / ED_PASSWORD + cookies FA / uuid — pas de FS.
+    return;
+  }
+
   try {
-    await ensureStoreDir();
+    await ensureDataDir();
     const previous = (await readStoredCredentials()) ?? {
       username: "",
       password: "",
@@ -63,20 +103,12 @@ export async function writeStoredCredentials(
 
     const clearFa = "cn" in creds && !creds.cn;
 
-    // Sur serverless, ne jamais écrire le mot de passe dans /tmp
-    const username = isServerlessRuntime()
-      ? previous.username || creds.username.trim()
-      : creds.username.trim() || previous.username;
-    const password = isServerlessRuntime()
-      ? previous.password || ""
-      : creds.password.trim() || previous.password;
-
     await writeFile(
-      STORE_PATH(),
+      STORE_PATH,
       JSON.stringify(
         {
-          username,
-          password,
+          username: creds.username.trim() || previous.username,
+          password: creds.password.trim() || previous.password,
           studentName:
             creds.studentName?.trim() || previous.studentName || "Maelle",
           cn: clearFa ? undefined : creds.cn?.trim() || previous.cn || undefined,
@@ -89,7 +121,9 @@ export async function writeStoredCredentials(
       "utf8"
     );
   } catch (error) {
-    if (isReadonlyFsError(error) || isServerlessRuntime()) {
+    const err = error as NodeJS.ErrnoException;
+    if (err?.code === "EROFS" || err?.code === "EACCES") {
+      // Fallback serverless / FS bloqué
       return;
     }
     throw error;
@@ -99,20 +133,16 @@ export async function writeStoredCredentials(
 export async function resolveCredentials(options?: {
   cookieCn?: string;
   cookieCv?: string;
-  cookieUuid?: string;
 }): Promise<EdCredentials | null> {
   const username = cleanEnv(process.env.ED_USERNAME);
   const password = cleanEnv(process.env.ED_PASSWORD);
   const stored = await readStoredCredentials();
+  const cookieUuid = await readUuidCookie();
 
   const cn =
     options?.cookieCn || cleanEnv(process.env.ED_CN) || stored?.cn;
   const cv =
     options?.cookieCv || cleanEnv(process.env.ED_CV) || stored?.cv;
-  const uuid =
-    options?.cookieUuid ||
-    cleanEnv(process.env.ED_UUID) ||
-    stored?.uuid;
 
   if (username && password) {
     return {
@@ -124,15 +154,15 @@ export async function resolveCredentials(options?: {
         "Maelle",
       cn,
       cv,
-      uuid,
+      uuid: cleanEnv(process.env.ED_UUID) || cookieUuid || stored?.uuid,
     };
   }
 
-  if (!stored?.username || !stored?.password) return null;
+  if (!stored) return null;
   return {
     ...stored,
     cn: options?.cookieCn || stored.cn,
     cv: options?.cookieCv || stored.cv,
-    uuid: options?.cookieUuid || stored.uuid,
+    uuid: cookieUuid || stored.uuid,
   };
 }

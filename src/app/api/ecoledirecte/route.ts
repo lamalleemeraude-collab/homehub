@@ -5,7 +5,6 @@ import {
 } from "@/lib/ecoledirecte/client";
 import {
   applyFaCookies,
-  applyUuidCookie,
   clearFaCookies,
   readFaFromCookie,
 } from "@/lib/ecoledirecte/fa-cookie";
@@ -36,7 +35,7 @@ export async function GET() {
     const result = await fetchHomeworkList(fa);
 
     if ("qcm" in result) {
-      const res = NextResponse.json(
+      return NextResponse.json(
         {
           ok: false,
           error: "Double authentification requise (QCM ÉcoleDirecte).",
@@ -46,14 +45,11 @@ export async function GET() {
         },
         { status: 401, headers: { "Cache-Control": "no-store" } }
       );
-      if (result.uuid) applyUuidCookie(res, result.uuid);
-      return res;
     }
 
     const res = NextResponse.json(okPayload(result.eleve, result.devoirs), {
       headers: { "Cache-Control": "no-store, max-age=0" },
     });
-    if (result.uuid) applyUuidCookie(res, result.uuid);
     return res;
   } catch (error) {
     const err = error as Error & { code?: number; challenge?: unknown };
@@ -70,22 +66,38 @@ export async function GET() {
         err.code === 250
           ? "Réponds au QCM de sécurité ÉcoleDirecte."
           : err.code === 503
-            ? "Sur Vercel, configure ED_USERNAME et ED_PASSWORD dans les variables d’environnement du projet."
+            ? "Sur Vercel : ajoute ED_USERNAME et ED_PASSWORD dans Environment Variables, puis redéploie."
             : err.code === 505
               ? "Souvent un blocage temporaire après trop d’essais. Connecte-toi une fois sur ecoledirecte.com, attends 10–15 min, puis réessaie ici."
               : "Vérifie les identifiants Maelle (ou compte famille).",
     };
 
+    // Ne jamais exposer une erreur FS brute au téléphone
+    if (
+      /EROFS|read-only file system|EACCES/i.test(payload.error || "")
+    ) {
+      payload.error =
+        "Serveur en lecture seule. Configure ED_USERNAME et ED_PASSWORD sur Vercel.";
+      payload.code = 503;
+      payload.hint =
+        "Vercel → Project → Settings → Environment Variables → redéployer.";
+    }
+
     if (err.challenge) payload.qcm = err.challenge;
 
     const status =
-      err.code === 503 ? 503 : err.code === 505 || err.code === 250 ? 401 : 502;
+      payload.code === 503
+        ? 503
+        : err.code === 505 || err.code === 250
+          ? 401
+          : 502;
 
     const res = NextResponse.json(payload, {
       status,
       headers: { "Cache-Control": "no-store, max-age=0" },
     });
 
+    // FA périmé → effacer cookies
     if (err.code === 505) clearFaCookies(res);
     return res;
   }
@@ -109,7 +121,6 @@ export async function POST(request: Request) {
       headers: { "Cache-Control": "no-store" },
     });
     if (result.fa) applyFaCookies(res, result.fa.cn, result.fa.cv);
-    if (result.uuid) applyUuidCookie(res, result.uuid);
     return res;
   } catch (error) {
     const err = error as Error & { code?: number; challenge?: unknown };
