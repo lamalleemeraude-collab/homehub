@@ -66,7 +66,7 @@ export async function GET() {
         err.code === 250
           ? "Réponds au QCM de sécurité ÉcoleDirecte."
           : err.code === 503
-            ? "Entre l’identifiant et le mot de passe dans le formulaire."
+            ? "Configure ED_USERNAME et ED_PASSWORD dans Vercel (Environment Variables), puis redéploie."
             : err.code === 505
               ? "Souvent un blocage temporaire après trop d’essais. Connecte-toi une fois sur ecoledirecte.com, attends 10–15 min, puis réessaie ici."
               : "Vérifie les identifiants Maelle (ou compte famille).",
