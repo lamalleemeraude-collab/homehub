@@ -16,7 +16,6 @@ type Qcm = {
   propositionValues: string[];
   token: string;
   twoFaToken?: string;
-  resume?: string;
 };
 
 type ErrorPayload = HomeworkErrorResponse & {
@@ -149,12 +148,10 @@ export default function DevoirsPage() {
     if (qcmBusy) return;
     setQcmBusy(true);
     try {
-      const resume =
-        state.status === "qcm" ? state.qcm.resume : undefined;
       const res = await fetch("/api/ecoledirecte", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ choix, resume }),
+        body: JSON.stringify({ choix }),
       });
       const data = (await res.json()) as HomeworkResponse | ErrorPayload;
       if ("qcm" in data && data.qcm && !data.ok) {
