@@ -515,24 +515,16 @@ export async function answerQcmAndLogin(
 
   const cn = answerRes.data.cn;
   const cv = answerRes.data.cv;
-  const resolved = await resolveCredentials({
-    cookieCn: cookieFa?.cn,
-    cookieCv: cookieFa?.cv,
-  });
-  const creds: EdCredentials = {
-    username: pending.creds.username || resolved?.username || "",
-    password: pending.creds.password || resolved?.password || "",
-    studentName: pending.creds.studentName || resolved?.studentName,
-    uuid: pending.creds.uuid || resolved?.uuid,
+  void cookieFa;
+  const envPassword = process.env.ED_PASSWORD?.trim() || "";
+  const envUser = process.env.ED_USERNAME?.trim() || "";
+  const creds = {
+    ...pending.creds,
+    username: pending.creds.username || envUser,
+    password: pending.creds.password || envPassword,
     cn,
     cv,
   };
-  if (!creds.username || !creds.password) {
-    throw Object.assign(
-      new Error("Identifiants manquants après le QCM."),
-      { code: 503 }
-    );
-  }
   await writeStoredCredentials(creds);
   await clearPendingQcm();
 

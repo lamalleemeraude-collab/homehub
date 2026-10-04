@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import {
-  isServerlessRuntime,
   readStoredCredentials,
   resolveCredentials,
   writeStoredCredentials,
 } from "@/lib/ecoledirecte/credentials";
+import { isServerlessRuntime } from "@/lib/ecoledirecte/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -15,28 +15,29 @@ export async function GET() {
     configured: Boolean(creds),
     username: creds?.username ?? "",
     source: fromEnv ? "env" : creds ? "file" : "none",
-    serverless: isServerlessRuntime(),
   });
 }
 
 export async function POST(request: Request) {
   try {
+    // Sur Vercel : les identifiants doivent être dans les variables d’environnement
     if (isServerlessRuntime()) {
-      // Sur Vercel le FS est read-only : les secrets vont dans les env Vercel.
-      const fromEnv = await resolveCredentials();
-      if (fromEnv) {
+      const envOk = Boolean(
+        process.env.ED_USERNAME?.trim() && process.env.ED_PASSWORD?.trim()
+      );
+      if (envOk) {
         return NextResponse.json({
           ok: true,
           configured: true,
           source: "env",
-          hint: "Identifiants déjà fournis via ED_USERNAME / ED_PASSWORD sur Vercel.",
+          hint: "Identifiants déjà configurés sur le serveur.",
         });
       }
       return NextResponse.json(
         {
           ok: false,
           error:
-            "En ligne, configure ED_USERNAME et ED_PASSWORD dans Vercel → Settings → Environment Variables, puis redéploie.",
+            "Sur Vercel, ajoute ED_USERNAME et ED_PASSWORD dans Project → Settings → Environment Variables, puis redéploie.",
         },
         { status: 503 }
       );
@@ -66,17 +67,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, configured: true, source: "file" });
   } catch (error) {
     console.error("[api/ecoledirecte/credentials]", error);
-    const err = error as NodeJS.ErrnoException;
-    if (err?.code === "EROFS" || err?.code === "EACCES") {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "Impossible d’écrire sur le serveur. Ajoute ED_USERNAME et ED_PASSWORD dans Vercel.",
-        },
-        { status: 503 }
-      );
-    }
     return NextResponse.json(
       { ok: false, error: "Impossible d’enregistrer." },
       { status: 500 }
