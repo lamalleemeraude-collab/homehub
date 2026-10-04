@@ -54,7 +54,7 @@ export async function deleteJsonFile(filename: string): Promise<void> {
   }
 }
 
-const COOKIE_UUID = "ed_device_uuid";
+const COOKIE_UUID = "ed_uuid";
 const COOKIE_PENDING = "ed_pending_qcm";
 const MAX_COOKIE = 3500;
 

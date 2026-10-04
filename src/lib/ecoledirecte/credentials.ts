@@ -45,7 +45,7 @@ export async function writeStoredCredentials(
     await writeUuidCookie(creds.uuid.trim());
   }
 
-  // Sur Vercel : identifiants = env ; on ne bloque jamais le login pour un FS RO
+  // Sur Vercel : identifiants = env ; ne jamais planter sur FS lecture seule
   if (isServerlessRuntime()) {
     return;
   }
@@ -55,7 +55,6 @@ export async function writeStoredCredentials(
     password: "",
   };
 
-  // `cn: undefined` / `cv: undefined` = effacer explicitement (FA périmé)
   const clearFa = "cn" in creds && !creds.cn;
 
   await writeJsonFile(STORE_FILE, {
@@ -72,11 +71,13 @@ export async function writeStoredCredentials(
 export async function resolveCredentials(options?: {
   cookieCn?: string;
   cookieCv?: string;
+  cookieUuid?: string;
 }): Promise<EdCredentials | null> {
   const username = cleanEnv(process.env.ED_USERNAME);
   const password = cleanEnv(process.env.ED_PASSWORD);
   const stored = await readStoredCredentials();
-  const cookieUuid = await readUuidCookie();
+  const cookieUuid =
+    options?.cookieUuid || (await readUuidCookie());
 
   const cn =
     options?.cookieCn || cleanEnv(process.env.ED_CN) || stored?.cn;

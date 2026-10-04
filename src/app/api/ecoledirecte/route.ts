@@ -5,6 +5,7 @@ import {
 } from "@/lib/ecoledirecte/client";
 import {
   applyFaCookies,
+  applyUuidCookie,
   clearFaCookies,
   readFaFromCookie,
 } from "@/lib/ecoledirecte/fa-cookie";
@@ -50,6 +51,7 @@ export async function GET() {
     const res = NextResponse.json(okPayload(result.eleve, result.devoirs), {
       headers: { "Cache-Control": "no-store, max-age=0" },
     });
+    if (result.uuid) applyUuidCookie(res, result.uuid);
     return res;
   } catch (error) {
     const err = error as Error & { code?: number; challenge?: unknown };
@@ -121,6 +123,7 @@ export async function POST(request: Request) {
       headers: { "Cache-Control": "no-store" },
     });
     if (result.fa) applyFaCookies(res, result.fa.cn, result.fa.cv);
+    if (result.uuid) applyUuidCookie(res, result.uuid);
     return res;
   } catch (error) {
     const err = error as Error & { code?: number; challenge?: unknown };
