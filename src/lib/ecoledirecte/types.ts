@@ -15,8 +15,6 @@ export type EdQcmChallenge = {
   propositionValues: string[];
   token: string;
   twoFaToken: string;
-  /** Session QCM sérialisée (Vercel / serverless — sans mot de passe). */
-  resume?: string;
 };
 
 export type HomeworkResponse = {
