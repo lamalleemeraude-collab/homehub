@@ -90,7 +90,7 @@ export const ECOLE_MODULES: EcoleModule[] = [
     id: "flashcards",
     href: "/flashcards",
     label: "Flashcards",
-    blurb: "Réviser en cartes, 5 min",
+    blurb: "Devoirs ou photo → cartes",
     icon: Layers,
     tone: "indigo",
   },
