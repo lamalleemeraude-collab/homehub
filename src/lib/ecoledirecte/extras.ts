@@ -156,6 +156,7 @@ function pickStudent(
 async function loginSession(cookieFa?: {
   cn?: string;
   cv?: string;
+  uuid?: string;
 }): Promise<
   | { status: "ok"; session: AuthSession; studentId: number; eleve: string }
   | { status: "qcm"; challenge: EdQcmChallenge }
@@ -166,6 +167,7 @@ async function loginSession(cookieFa?: {
   const creds = await resolveCredentials({
     cookieCn: cookieFa?.cn,
     cookieCv: cookieFa?.cv,
+    cookieUuid: cookieFa?.uuid,
   });
   if (!creds) {
     throw Object.assign(new Error("Identifiants manquants"), { code: 503 });
@@ -247,6 +249,7 @@ function todayIso() {
 export async function fetchStudentExtras(cookieFa?: {
   cn?: string;
   cv?: string;
+  uuid?: string;
 }): Promise<{
   notes: DashboardGrade[];
   cours: DashboardCourse[];

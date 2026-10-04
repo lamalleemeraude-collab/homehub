@@ -17,6 +17,7 @@ export type {
 export async function fetchStudentDashboard(cookieFa?: {
   cn?: string;
   cv?: string;
+  uuid?: string;
 }): Promise<DashboardResult> {
   const homework = await fetchHomeworkList(cookieFa);
   if ("qcm" in homework) return homework;

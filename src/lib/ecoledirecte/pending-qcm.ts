@@ -1,16 +1,12 @@
 import { mkdir, readFile, unlink, writeFile } from "fs/promises";
+import { tmpdir } from "os";
 import path from "path";
-import { cookies } from "next/headers";
-import {
-  resolveCredentials,
-  usesFileCredentialStore,
-  type EdCredentials,
-} from "./credentials";
+import type { EdCredentials } from "./credentials";
 import type { EdQcmChallenge } from "./types";
 
 const DATA_DIR = path.join(process.cwd(), "data");
-const STORE_PATH = path.join(DATA_DIR, "ed-pending-qcm.json");
-const COOKIE = "ed_pending_qcm";
+const LOCAL_PATH = path.join(DATA_DIR, "ed-pending-qcm.json");
+const TMP_PATH = path.join(tmpdir(), "homehub-ed-pending-qcm.json");
 
 export type PendingQcmStore = {
   creds: EdCredentials;
@@ -24,127 +20,102 @@ export type PendingQcmStore = {
   createdAt: number;
 };
 
-/** Cookie : pas de mot de passe (rechargé via env/fichier à la lecture). */
-type PendingQcmSlim = {
+/** Payload envoyé au client (sans mot de passe) pour reprendre le QCM sur Vercel. */
+export type QcmResumePayload = {
+  v: 1;
+  createdAt: number;
+  uuid?: string;
+  studentName?: string;
   challenge: EdQcmChallenge;
   session: PendingQcmStore["session"];
-  createdAt: number;
-  studentName?: string;
 };
 
-function isExpired(createdAt: number): boolean {
-  return Date.now() - createdAt > 10 * 60 * 1000;
+function isServerless(): boolean {
+  return Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 }
 
-async function savePendingFile(data: PendingQcmStore): Promise<void> {
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(STORE_PATH, JSON.stringify(data), "utf8");
+function paths(): string[] {
+  return isServerless() ? [TMP_PATH] : [LOCAL_PATH, TMP_PATH];
 }
 
-async function readPendingFile(): Promise<PendingQcmStore | null> {
+function isRoFsError(error: unknown): boolean {
+  const err = error as NodeJS.ErrnoException;
+  return (
+    err?.code === "EROFS" ||
+    err?.code === "EACCES" ||
+    err?.code === "EPERM" ||
+    (typeof err?.message === "string" &&
+      err.message.toLowerCase().includes("read-only file system"))
+  );
+}
+
+export function encodeQcmResume(
+  data: Omit<QcmResumePayload, "v">
+): string {
+  const payload: QcmResumePayload = { v: 1, ...data };
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+}
+
+export function decodeQcmResume(raw: string): QcmResumePayload | null {
   try {
-    const raw = await readFile(STORE_PATH, "utf8");
-    const parsed = JSON.parse(raw) as PendingQcmStore;
-    if (!parsed?.challenge || isExpired(parsed.createdAt)) {
-      await clearPendingFile();
-      return null;
-    }
+    const parsed = JSON.parse(
+      Buffer.from(raw, "base64url").toString("utf8")
+    ) as QcmResumePayload;
+    if (parsed?.v !== 1 || !parsed.challenge || !parsed.session) return null;
+    if (Date.now() - parsed.createdAt > 10 * 60 * 1000) return null;
     return parsed;
   } catch {
     return null;
   }
 }
 
-async function clearPendingFile(): Promise<void> {
-  try {
-    await unlink(STORE_PATH);
-  } catch {
-    /* ignore */
-  }
-}
-
-async function savePendingCookie(data: PendingQcmStore): Promise<void> {
-  const slim: PendingQcmSlim = {
-    challenge: data.challenge,
-    session: data.session,
-    createdAt: data.createdAt,
-    studentName: data.creds.studentName,
-  };
-  const value = Buffer.from(JSON.stringify(slim), "utf8").toString("base64url");
-  const jar = await cookies();
-  jar.set(COOKIE, value, {
-    path: "/",
-    maxAge: 10 * 60,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    httpOnly: true,
+export function resumeFromPending(pending: PendingQcmStore): string {
+  return encodeQcmResume({
+    createdAt: pending.createdAt,
+    uuid: pending.creds.uuid,
+    studentName: pending.creds.studentName,
+    challenge: pending.challenge,
+    session: pending.session,
   });
 }
 
-async function readPendingCookie(): Promise<PendingQcmStore | null> {
-  try {
-    const jar = await cookies();
-    const raw = jar.get(COOKIE)?.value;
-    if (!raw) return null;
-    const slim = JSON.parse(
-      Buffer.from(raw, "base64url").toString("utf8")
-    ) as PendingQcmSlim;
-    if (!slim?.challenge || isExpired(slim.createdAt)) {
-      await clearPendingCookie();
-      return null;
-    }
-    const creds = await resolveCredentials();
-    if (!creds) {
-      await clearPendingCookie();
-      return null;
-    }
-    return {
-      challenge: slim.challenge,
-      session: slim.session,
-      createdAt: slim.createdAt,
-      creds: {
-        ...creds,
-        studentName: slim.studentName || creds.studentName,
-      },
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function clearPendingCookie(): Promise<void> {
-  try {
-    const jar = await cookies();
-    jar.set(COOKIE, "", { path: "/", maxAge: 0 });
-  } catch {
-    /* ignore */
-  }
-}
-
 export async function savePendingQcm(data: PendingQcmStore): Promise<void> {
-  if (usesFileCredentialStore()) {
+  for (const filePath of paths()) {
     try {
-      await savePendingFile(data);
+      await mkdir(path.dirname(filePath), { recursive: true });
+      await writeFile(filePath, JSON.stringify(data), "utf8");
       return;
     } catch (error) {
-      const err = error as NodeJS.ErrnoException;
-      if (err.code !== "EROFS" && err.code !== "EACCES") throw error;
+      if (isRoFsError(error) || isServerless()) continue;
+      throw error;
     }
   }
-  await savePendingCookie(data);
+  // Serverless : le client porte le resume — pas bloquant
 }
 
 export async function readPendingQcm(): Promise<PendingQcmStore | null> {
-  if (usesFileCredentialStore()) {
-    const fromFile = await readPendingFile();
-    if (fromFile) return fromFile;
+  for (const filePath of paths()) {
+    try {
+      const raw = await readFile(filePath, "utf8");
+      const parsed = JSON.parse(raw) as PendingQcmStore;
+      if (!parsed?.challenge || Date.now() - parsed.createdAt > 10 * 60 * 1000) {
+        await clearPendingQcm();
+        return null;
+      }
+      return parsed;
+    } catch {
+      /* try next */
+    }
   }
-  return readPendingCookie();
+  return null;
 }
 
 export async function clearPendingQcm(): Promise<void> {
-  if (usesFileCredentialStore()) {
-    await clearPendingFile();
+  for (const filePath of paths()) {
+    try {
+      await unlink(filePath);
+    } catch {
+      /* ignore */
+    }
   }
-  await clearPendingCookie();
 }

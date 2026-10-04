@@ -1,12 +1,11 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
-import {
-  readUuidFromCookie,
-  setUuidCookie,
-} from "./uuid-cookie";
+import { tmpdir } from "os";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const STORE_PATH = path.join(DATA_DIR, "ed-credentials.json");
+/** Sur Vercel, seul /tmp est writable (éphémère). */
+const TMP_STORE_PATH = path.join(tmpdir(), "homehub-ed-credentials.json");
 
 export type EdCredentials = {
   username: string;
@@ -18,19 +17,29 @@ export type EdCredentials = {
   uuid?: string;
 };
 
-/** Vercel / Lambda : FS lecture seule — pas de data/*.json. */
-export function usesFileCredentialStore(): boolean {
-  return !process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME;
+function isServerless(): boolean {
+  return Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 }
 
-async function ensureDataDir(): Promise<void> {
-  await mkdir(DATA_DIR, { recursive: true });
+function storePaths(): string[] {
+  // Local : data/ d’abord. Serverless : /tmp uniquement.
+  return isServerless() ? [TMP_STORE_PATH] : [STORE_PATH, TMP_STORE_PATH];
 }
 
-export async function readStoredCredentials(): Promise<EdCredentials | null> {
-  if (!usesFileCredentialStore()) return null;
+function isRoFsError(error: unknown): boolean {
+  const err = error as NodeJS.ErrnoException;
+  return (
+    err?.code === "EROFS" ||
+    err?.code === "EACCES" ||
+    err?.code === "EPERM" ||
+    (typeof err?.message === "string" &&
+      err.message.toLowerCase().includes("read-only file system"))
+  );
+}
+
+async function readFromPath(filePath: string): Promise<EdCredentials | null> {
   try {
-    const raw = await readFile(STORE_PATH, "utf8");
+    const raw = await readFile(filePath, "utf8");
     const parsed = JSON.parse(raw) as Partial<EdCredentials>;
     const username = parsed.username?.trim() ?? "";
     const password = parsed.password?.trim() ?? "";
@@ -48,78 +57,84 @@ export async function readStoredCredentials(): Promise<EdCredentials | null> {
   }
 }
 
+export async function readStoredCredentials(): Promise<EdCredentials | null> {
+  for (const filePath of storePaths()) {
+    const creds = await readFromPath(filePath);
+    if (creds) return creds;
+  }
+  return null;
+}
+
 function cleanEnv(value?: string | null): string {
   return (value ?? "").replace(/^\uFEFF/, "").trim();
 }
 
+async function writeToPath(
+  filePath: string,
+  payload: Record<string, unknown>
+): Promise<void> {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, JSON.stringify(payload, null, 2), "utf8");
+}
+
 /**
- * Persiste ce qui est possible :
- * - local : fichier data/ed-credentials.json
- * - Vercel : uuid en cookie ; cn/cv via fa-cookie (réponse API) ; login via env
+ * Persiste uuid / FA / password en local.
+ * Sur Vercel : tente /tmp, ne jamais throw (env + cookies = source de vérité).
  */
 export async function writeStoredCredentials(
   creds: EdCredentials
 ): Promise<void> {
-  if (creds.uuid?.trim()) {
-    await setUuidCookie(creds.uuid.trim());
-  }
+  const previous = (await readStoredCredentials()) ?? {
+    username: "",
+    password: "",
+  };
 
-  if (!usesFileCredentialStore()) {
-    return;
-  }
+  // `cn: undefined` / `cv: undefined` = effacer explicitement (FA périmé)
+  const clearFa = "cn" in creds && !creds.cn;
 
-  try {
-    await ensureDataDir();
-    const previous = (await readStoredCredentials()) ?? {
-      username: "",
-      password: "",
-    };
+  const payload = {
+    username: creds.username.trim() || previous.username,
+    password: creds.password.trim() || previous.password,
+    studentName:
+      creds.studentName?.trim() || previous.studentName || "Maelle",
+    cn: clearFa ? undefined : creds.cn?.trim() || previous.cn || undefined,
+    cv: clearFa ? undefined : creds.cv?.trim() || previous.cv || undefined,
+    uuid: creds.uuid?.trim() || previous.uuid || undefined,
+  };
 
-    // `cn: undefined` / `cv: undefined` = effacer explicitement (FA périmé)
-    const clearFa = "cn" in creds && !creds.cn;
-
-    await writeFile(
-      STORE_PATH,
-      JSON.stringify(
-        {
-          username: creds.username.trim() || previous.username,
-          password: creds.password.trim() || previous.password,
-          studentName:
-            creds.studentName?.trim() || previous.studentName || "Maelle",
-          cn: clearFa ? undefined : creds.cn?.trim() || previous.cn || undefined,
-          cv: clearFa ? undefined : creds.cv?.trim() || previous.cv || undefined,
-          uuid: creds.uuid?.trim() || previous.uuid || undefined,
-        },
-        null,
-        2
-      ),
-      "utf8"
-    );
-  } catch (error) {
-    const err = error as NodeJS.ErrnoException;
-    if (err.code === "EROFS" || err.code === "EACCES") {
-      console.warn(
-        "[ecoledirecte] FS non inscriptible — uuid/FA via cookies, login via env."
-      );
+  let lastError: unknown;
+  for (const filePath of storePaths()) {
+    try {
+      await writeToPath(filePath, payload);
       return;
+    } catch (error) {
+      lastError = error;
+      if (isRoFsError(error)) continue;
     }
-    throw error;
   }
+
+  // Serverless / FS read-only : ignore (cookies + env portent le reste)
+  if (isServerless() || isRoFsError(lastError)) return;
+  throw lastError;
 }
 
 export async function resolveCredentials(options?: {
   cookieCn?: string;
   cookieCv?: string;
+  cookieUuid?: string;
 }): Promise<EdCredentials | null> {
   const username = cleanEnv(process.env.ED_USERNAME);
   const password = cleanEnv(process.env.ED_PASSWORD);
   const stored = await readStoredCredentials();
-  const cookieUuid = await readUuidFromCookie();
 
   const cn =
     options?.cookieCn || cleanEnv(process.env.ED_CN) || stored?.cn;
   const cv =
     options?.cookieCv || cleanEnv(process.env.ED_CV) || stored?.cv;
+  const uuid =
+    options?.cookieUuid ||
+    cleanEnv(process.env.ED_UUID) ||
+    stored?.uuid;
 
   if (username && password) {
     return {
@@ -131,7 +146,7 @@ export async function resolveCredentials(options?: {
         "Maelle",
       cn,
       cv,
-      uuid: cleanEnv(process.env.ED_UUID) || cookieUuid || stored?.uuid,
+      uuid,
     };
   }
 
@@ -140,6 +155,11 @@ export async function resolveCredentials(options?: {
     ...stored,
     cn: options?.cookieCn || stored.cn,
     cv: options?.cookieCv || stored.cv,
-    uuid: cookieUuid || stored.uuid,
+    uuid: options?.cookieUuid || stored.uuid,
   };
+}
+
+/** true si ED_USERNAME / ED_PASSWORD sont définis (prod Vercel). */
+export function hasEnvCredentials(): boolean {
+  return Boolean(cleanEnv(process.env.ED_USERNAME) && cleanEnv(process.env.ED_PASSWORD));
 }

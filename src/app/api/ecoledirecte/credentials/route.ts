@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import {
+  hasEnvCredentials,
   readStoredCredentials,
   resolveCredentials,
-  usesFileCredentialStore,
   writeStoredCredentials,
 } from "@/lib/ecoledirecte/credentials";
 
@@ -10,40 +10,24 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const creds = await resolveCredentials();
-  const fromEnv = Boolean(
-    process.env.ED_USERNAME?.trim() && process.env.ED_PASSWORD?.trim()
-  );
+  const fromEnv = hasEnvCredentials();
   return NextResponse.json({
     configured: Boolean(creds),
-    username: fromEnv ? (process.env.ED_USERNAME?.trim() ?? "") : creds?.username ?? "",
+    username: creds?.username ?? "",
     source: fromEnv ? "env" : creds ? "file" : "none",
-    serverless: !usesFileCredentialStore(),
   });
 }
 
 export async function POST(request: Request) {
   try {
-    const fromEnv = Boolean(
-      process.env.ED_USERNAME?.trim() && process.env.ED_PASSWORD?.trim()
-    );
-
-    // Prod Vercel : les identifiants viennent des env vars, pas d’un fichier.
-    if (!usesFileCredentialStore()) {
-      if (fromEnv) {
-        return NextResponse.json({
-          ok: true,
-          configured: true,
-          source: "env",
-        });
-      }
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "Sur Vercel, ajoute ED_USERNAME et ED_PASSWORD dans Project Settings → Environment Variables, puis redéploie.",
-        },
-        { status: 503 }
-      );
+    // Sur Vercel, les secrets doivent être en variables d’environnement.
+    if (hasEnvCredentials()) {
+      return NextResponse.json({
+        ok: true,
+        configured: true,
+        source: "env",
+        message: "Identifiants déjà configurés côté serveur (Vercel).",
+      });
     }
 
     const body = (await request.json()) as {
@@ -70,11 +54,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, configured: true, source: "file" });
   } catch (error) {
     console.error("[api/ecoledirecte/credentials]", error);
-    const err = error as NodeJS.ErrnoException;
-    const message =
-      err.code === "EROFS"
-        ? "Serveur en lecture seule — configure ED_USERNAME / ED_PASSWORD sur Vercel."
+    const msg =
+      error instanceof Error && error.message.includes("read-only")
+        ? "Sur Vercel, ajoute ED_USERNAME et ED_PASSWORD dans les variables d’environnement du projet."
         : "Impossible d’enregistrer.";
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }

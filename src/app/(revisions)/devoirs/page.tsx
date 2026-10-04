@@ -16,6 +16,7 @@ type Qcm = {
   propositionValues: string[];
   token: string;
   twoFaToken?: string;
+  resume?: string;
 };
 
 type ErrorPayload = HomeworkErrorResponse & {
@@ -148,10 +149,12 @@ export default function DevoirsPage() {
     if (qcmBusy) return;
     setQcmBusy(true);
     try {
+      const resume =
+        state.status === "qcm" ? state.qcm.resume : undefined;
       const res = await fetch("/api/ecoledirecte", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ choix }),
+        body: JSON.stringify({ choix, resume }),
       });
       const data = (await res.json()) as HomeworkResponse | ErrorPayload;
       if ("qcm" in data && data.qcm && !data.ok) {
@@ -177,16 +180,8 @@ export default function DevoirsPage() {
     }
   }
 
-  const isServerlessHint =
-    state.status === "error" &&
-    (state.data.error.toLowerCase().includes("vercel") ||
-      state.data.error.toLowerCase().includes("lecture seule") ||
-      state.data.error.toLowerCase().includes("environment variables") ||
-      state.data.error.toLowerCase().includes("erofs"));
-
   const showLoginForm =
     state.status === "error" &&
-    !isServerlessHint &&
     (state.data.code === 503 ||
       state.data.code === 505 ||
       state.data.error.toLowerCase().includes("identifiant") ||
@@ -222,23 +217,6 @@ export default function DevoirsPage() {
         <p className="rounded-3xl border border-white/60 bg-white/55 px-3.5 py-4 text-sm font-medium text-slate-600 shadow-xl shadow-slate-900/10 backdrop-blur-2xl">
           Chargement des devoirs…
         </p>
-      )}
-
-      {isServerlessHint && (
-        <div className="mb-3 space-y-2 rounded-3xl border border-amber-200/80 bg-amber-50/95 px-3.5 py-4 text-sm text-amber-950 shadow-xl">
-          <p className="font-bold">Config serveur manquante</p>
-          <p className="text-[0.8125rem] leading-snug text-amber-900/85">
-            Sur Vercel, les identifiants ne peuvent pas être enregistrés dans un
-            fichier. Ajoute{" "}
-            <span className="font-bold">ED_USERNAME</span>,{" "}
-            <span className="font-bold">ED_PASSWORD</span> et{" "}
-            <span className="font-bold">ED_STUDENT_NAME</span> dans Project
-            Settings → Environment Variables, puis redéploie.
-          </p>
-          <p className="break-words text-[0.75rem] text-amber-800/80">
-            {state.status === "error" ? state.data.error : ""}
-          </p>
-        </div>
       )}
 
       {showLoginForm && (

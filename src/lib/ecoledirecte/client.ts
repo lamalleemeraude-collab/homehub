@@ -15,7 +15,9 @@ import {
 } from "./credentials";
 import {
   clearPendingQcm,
+  decodeQcmResume,
   readPendingQcm,
+  resumeFromPending,
   savePendingQcm,
 } from "./pending-qcm";
 import type { EdQcmChallenge, HomeworkItem } from "./types";
@@ -373,8 +375,18 @@ async function fetchQcm(session: AuthSession): Promise<EdQcmChallenge> {
 async function attemptLogin(
   creds: EdCredentials
 ): Promise<
-  | { status: "ok"; session: AuthSession; accounts: EdAccount[] }
-  | { status: "qcm"; session: AuthSession; challenge: EdQcmChallenge }
+  | {
+      status: "ok";
+      session: AuthSession;
+      accounts: EdAccount[];
+      uuid: string;
+    }
+  | {
+      status: "qcm";
+      session: AuthSession;
+      challenge: EdQcmChallenge;
+      uuid: string;
+    }
 > {
   const session = await bootstrapGtk();
 
@@ -384,6 +396,7 @@ async function attemptLogin(
     uuid = randomUUID();
     await writeStoredCredentials({ ...creds, uuid });
   }
+  creds.uuid = uuid;
 
   const fa =
     creds.cn && creds.cv
@@ -447,7 +460,7 @@ async function attemptLogin(
     }
     if (!session.token && loginRes.token) session.token = loginRes.token;
     const challenge = await fetchQcm(session);
-    return { status: "qcm", session, challenge };
+    return { status: "qcm", session, challenge, uuid };
   }
 
   if (loginRes.code !== 200 || !session.token) {
@@ -461,19 +474,42 @@ async function attemptLogin(
     status: "ok",
     session,
     accounts: loginRes.data?.accounts ?? [],
+    uuid,
   };
 }
 
 export async function answerQcmAndLogin(
   choix: string,
-  cookieFa?: { cn?: string; cv?: string }
+  cookieFa?: { cn?: string; cv?: string; uuid?: string },
+  resumeToken?: string
 ): Promise<{
   eleve: string;
   devoirs: HomeworkItem[];
   fa?: { cn: string; cv: string };
+  uuid?: string;
+  qcm?: EdQcmChallenge;
 }> {
-  const pending = await readPendingQcm();
-  if (!pending) {
+  const pendingFile = await readPendingQcm();
+  const resume = resumeToken ? decodeQcmResume(resumeToken) : null;
+
+  let sessionJson: PendingQcmStoreSession | null = null;
+  let challenge: EdQcmChallenge | null = null;
+  let uuid = cookieFa?.uuid;
+  let studentName: string | undefined;
+
+  if (pendingFile) {
+    sessionJson = pendingFile.session;
+    challenge = pendingFile.challenge;
+    uuid = pendingFile.creds.uuid || uuid;
+    studentName = pendingFile.creds.studentName;
+  } else if (resume) {
+    sessionJson = resume.session;
+    challenge = resume.challenge;
+    uuid = resume.uuid || uuid;
+    studentName = resume.studentName;
+  }
+
+  if (!sessionJson || !challenge) {
     throw Object.assign(
       new Error(
         "Session QCM expirée. Clique une seule fois sur « Réessayer », puis réponds au QCM."
@@ -482,12 +518,22 @@ export async function answerQcmAndLogin(
     );
   }
 
-  const session = sessionFromJson(pending.session);
-  // Restaurer les tokens du challenge
-  session.token = pending.challenge.token || session.token;
-  session.twoFaToken = pending.challenge.twoFaToken || session.twoFaToken;
+  const baseCreds = await resolveCredentials({
+    cookieCn: cookieFa?.cn,
+    cookieCv: cookieFa?.cv,
+    cookieUuid: uuid,
+  });
+  if (!baseCreds) {
+    throw Object.assign(new Error("Identifiants ÉcoleDirecte manquants."), {
+      code: 503,
+    });
+  }
 
-  const choixB64 = pending.challenge.propositionValues.includes(choix)
+  const session = sessionFromJson(sessionJson);
+  session.token = challenge.token || session.token;
+  session.twoFaToken = challenge.twoFaToken || session.twoFaToken;
+
+  const choixB64 = challenge.propositionValues.includes(choix)
     ? choix
     : Buffer.from(choix, "utf8").toString("base64");
 
@@ -515,24 +561,36 @@ export async function answerQcmAndLogin(
 
   const cn = answerRes.data.cn;
   const cv = answerRes.data.cv;
-  void cookieFa;
-  const creds = { ...pending.creds, cn, cv };
+  const creds = {
+    ...baseCreds,
+    cn,
+    cv,
+    uuid: uuid || baseCreds.uuid,
+    studentName: studentName || baseCreds.studentName,
+  };
   await writeStoredCredentials(creds);
   await clearPendingQcm();
 
   // Un seul login final avec cn/cv mémorisés
   const finalLogin = await attemptLogin(creds);
   if (finalLogin.status === "qcm") {
-    await savePendingQcm({
+    const pending = {
       creds,
       challenge: finalLogin.challenge,
       session: sessionToJson(finalLogin.session),
       createdAt: Date.now(),
-    });
-    throw Object.assign(
-      new Error("Autre question de sécurité — choisis encore (une seule fois)."),
-      { code: 250, challenge: finalLogin.challenge }
-    );
+    };
+    await savePendingQcm(pending);
+    const nextQcm: EdQcmChallenge = {
+      ...finalLogin.challenge,
+      resume: resumeFromPending(pending),
+    };
+    return {
+      eleve: "",
+      devoirs: [],
+      uuid: finalLogin.uuid,
+      qcm: nextQcm,
+    };
   }
 
   const homework = await fetchHomeworkWithSession(
@@ -540,19 +598,28 @@ export async function answerQcmAndLogin(
     finalLogin.accounts,
     creds.studentName
   );
-  return { ...homework, fa: { cn, cv } };
+  return { ...homework, fa: { cn, cv }, uuid: finalLogin.uuid };
 }
+
+type PendingQcmStoreSession = {
+  cookies: Record<string, string>;
+  gtk?: string;
+  token?: string;
+  twoFaToken?: string;
+};
 
 export async function fetchHomeworkList(cookieFa?: {
   cn?: string;
   cv?: string;
+  uuid?: string;
 }): Promise<
-  | { eleve: string; devoirs: HomeworkItem[]; clearFa?: boolean }
-  | { qcm: EdQcmChallenge }
+  | { eleve: string; devoirs: HomeworkItem[]; clearFa?: boolean; uuid?: string }
+  | { qcm: EdQcmChallenge; uuid?: string }
 > {
   const creds = await resolveCredentials({
     cookieCn: cookieFa?.cn,
     cookieCv: cookieFa?.cv,
+    cookieUuid: cookieFa?.uuid,
   });
 
   if (!creds) {
@@ -564,27 +631,41 @@ export async function fetchHomeworkList(cookieFa?: {
   // Si un QCM est déjà en cours, ne pas relancer un login
   const pending = await readPendingQcm();
   if (pending) {
-    return { qcm: pending.challenge };
+    return {
+      qcm: {
+        ...pending.challenge,
+        resume: resumeFromPending(pending),
+      },
+      uuid: pending.creds.uuid,
+    };
   }
 
   const result = await attemptLogin(creds);
 
   if (result.status === "qcm") {
-    await savePendingQcm({
-      creds,
+    const store = {
+      creds: { ...creds, uuid: result.uuid },
       challenge: result.challenge,
       session: sessionToJson(result.session),
       createdAt: Date.now(),
-    });
-    return { qcm: result.challenge };
+    };
+    await savePendingQcm(store);
+    return {
+      qcm: {
+        ...result.challenge,
+        resume: resumeFromPending(store),
+      },
+      uuid: result.uuid,
+    };
   }
 
   await clearPendingQcm();
-  return fetchHomeworkWithSession(
+  const homework = await fetchHomeworkWithSession(
     result.session,
     result.accounts,
     creds.studentName
   );
+  return { ...homework, uuid: result.uuid };
 }
 
 async function fetchUpcoming(
