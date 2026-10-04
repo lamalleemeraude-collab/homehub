@@ -1,0 +1,32 @@
+import type { TideScheduleRaw } from "./types";
+
+/** Secours si maree.info est indisponible (Saint-Malo). */
+export const SAINT_MALO_FALLBACK_SCHEDULE: TideScheduleRaw[] = [
+  { iso: "2026-10-04T00:40:00+02:00", type: "high", heightM: 9.37, coefficient: 46 },
+  { iso: "2026-10-04T07:29:00+02:00", type: "low", heightM: 4.51 },
+  { iso: "2026-10-04T13:14:00+02:00", type: "high", heightM: 9.27, coefficient: 41 },
+  { iso: "2026-10-04T20:20:00+02:00", type: "low", heightM: 4.6 },
+  { iso: "2026-10-05T02:26:00+02:00", type: "high", heightM: 8.78, coefficient: 40 },
+  { iso: "2026-10-05T09:06:00+02:00", type: "low", heightM: 4.9 },
+  { iso: "2026-10-05T15:10:00+02:00", type: "high", heightM: 9.08, coefficient: 43 },
+  { iso: "2026-10-05T22:13:00+02:00", type: "low", heightM: 4.46 },
+  { iso: "2026-10-06T04:17:00+02:00", type: "high", heightM: 9.16, coefficient: 48 },
+  { iso: "2026-10-06T10:53:00+02:00", type: "low", heightM: 4.4 },
+  { iso: "2026-10-06T16:44:00+02:00", type: "high", heightM: 9.76, coefficient: 55 },
+  { iso: "2026-10-06T23:40:00+02:00", type: "low", heightM: 3.61 },
+  { iso: "2026-10-07T05:28:00+02:00", type: "high", heightM: 10.07, coefficient: 62 },
+  { iso: "2026-10-07T12:07:00+02:00", type: "low", heightM: 3.44 },
+  { iso: "2026-10-07T17:46:00+02:00", type: "high", heightM: 10.72, coefficient: 70 },
+  { iso: "2026-10-08T00:42:00+02:00", type: "low", heightM: 2.68 },
+  { iso: "2026-10-08T06:19:00+02:00", type: "high", heightM: 10.99, coefficient: 77 },
+  { iso: "2026-10-08T13:04:00+02:00", type: "low", heightM: 2.56 },
+  { iso: "2026-10-08T18:35:00+02:00", type: "high", heightM: 11.56, coefficient: 83 },
+  { iso: "2026-10-09T01:34:00+02:00", type: "low", heightM: 1.99 },
+  { iso: "2026-10-09T07:03:00+02:00", type: "high", heightM: 11.7, coefficient: 87 },
+  { iso: "2026-10-09T13:53:00+02:00", type: "low", heightM: 1.95 },
+  { iso: "2026-10-09T19:18:00+02:00", type: "high", heightM: 12.12, coefficient: 91 },
+  { iso: "2026-10-10T02:19:00+02:00", type: "low", heightM: 1.61 },
+  { iso: "2026-10-10T07:42:00+02:00", type: "high", heightM: 12.12, coefficient: 94 },
+  { iso: "2026-10-10T14:36:00+02:00", type: "low", heightM: 1.66 },
+  { iso: "2026-10-10T19:57:00+02:00", type: "high", heightM: 12.39, coefficient: 95 },
+];
