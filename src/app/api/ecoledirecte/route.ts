@@ -70,7 +70,7 @@ export async function GET() {
         err.code === 250
           ? "Réponds au QCM de sécurité ÉcoleDirecte."
           : err.code === 503
-            ? "Configure ED_USERNAME / ED_PASSWORD sur Vercel (ou le formulaire en local)."
+            ? "Sur Vercel, configure ED_USERNAME et ED_PASSWORD dans les variables d’environnement du projet."
             : err.code === 505
               ? "Souvent un blocage temporaire après trop d’essais. Connecte-toi une fois sur ecoledirecte.com, attends 10–15 min, puis réessaie ici."
               : "Vérifie les identifiants Maelle (ou compte famille).",
@@ -86,19 +86,15 @@ export async function GET() {
       headers: { "Cache-Control": "no-store, max-age=0" },
     });
 
-    // FA périmé → effacer cookies
     if (err.code === 505) clearFaCookies(res);
     return res;
   }
 }
 
-/** Réponse au QCM double-auth. Body: { choix: string, resume?: string } */
+/** Réponse au QCM double-auth. Body: { choix: string } */
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as {
-      choix?: string;
-      resume?: string;
-    };
+    const body = (await request.json()) as { choix?: string };
     const choix = body.choix?.trim() ?? "";
     if (!choix) {
       return NextResponse.json(
@@ -108,26 +104,7 @@ export async function POST(request: Request) {
     }
 
     const cookieFa = await readFaFromCookie();
-    const result = await answerQcmAndLogin(
-      choix,
-      cookieFa,
-      body.resume?.trim()
-    );
-
-    if (result.qcm) {
-      const res = NextResponse.json(
-        {
-          ok: false,
-          error: "Autre question de sécurité — choisis encore (une seule fois).",
-          code: 250,
-          qcm: result.qcm,
-        },
-        { status: 401, headers: { "Cache-Control": "no-store" } }
-      );
-      if (result.uuid) applyUuidCookie(res, result.uuid);
-      return res;
-    }
-
+    const result = await answerQcmAndLogin(choix, cookieFa);
     const res = NextResponse.json(okPayload(result.eleve, result.devoirs), {
       headers: { "Cache-Control": "no-store" },
     });

@@ -1,11 +1,12 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
-import { tmpdir } from "os";
+import {
+  edStoreDir,
+  isReadonlyFsError,
+  isServerlessRuntime,
+} from "./runtime-fs";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const STORE_PATH = path.join(DATA_DIR, "ed-credentials.json");
-/** Sur Vercel, seul /tmp est writable (éphémère). */
-const TMP_STORE_PATH = path.join(tmpdir(), "homehub-ed-credentials.json");
+const STORE_PATH = () => path.join(edStoreDir(), "ed-credentials.json");
 
 export type EdCredentials = {
   username: string;
@@ -17,29 +18,17 @@ export type EdCredentials = {
   uuid?: string;
 };
 
-function isServerless(): boolean {
-  return Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+function cleanEnv(value?: string | null): string {
+  return (value ?? "").replace(/^\uFEFF/, "").trim();
 }
 
-function storePaths(): string[] {
-  // Local : data/ d’abord. Serverless : /tmp uniquement.
-  return isServerless() ? [TMP_STORE_PATH] : [STORE_PATH, TMP_STORE_PATH];
+async function ensureStoreDir(): Promise<void> {
+  await mkdir(edStoreDir(), { recursive: true });
 }
 
-function isRoFsError(error: unknown): boolean {
-  const err = error as NodeJS.ErrnoException;
-  return (
-    err?.code === "EROFS" ||
-    err?.code === "EACCES" ||
-    err?.code === "EPERM" ||
-    (typeof err?.message === "string" &&
-      err.message.toLowerCase().includes("read-only file system"))
-  );
-}
-
-async function readFromPath(filePath: string): Promise<EdCredentials | null> {
+export async function readStoredCredentials(): Promise<EdCredentials | null> {
   try {
-    const raw = await readFile(filePath, "utf8");
+    const raw = await readFile(STORE_PATH(), "utf8");
     const parsed = JSON.parse(raw) as Partial<EdCredentials>;
     const username = parsed.username?.trim() ?? "";
     const password = parsed.password?.trim() ?? "";
@@ -57,65 +46,54 @@ async function readFromPath(filePath: string): Promise<EdCredentials | null> {
   }
 }
 
-export async function readStoredCredentials(): Promise<EdCredentials | null> {
-  for (const filePath of storePaths()) {
-    const creds = await readFromPath(filePath);
-    if (creds) return creds;
-  }
-  return null;
-}
-
-function cleanEnv(value?: string | null): string {
-  return (value ?? "").replace(/^\uFEFF/, "").trim();
-}
-
-async function writeToPath(
-  filePath: string,
-  payload: Record<string, unknown>
-): Promise<void> {
-  await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, JSON.stringify(payload, null, 2), "utf8");
-}
-
 /**
- * Persiste uuid / FA / password en local.
- * Sur Vercel : tente /tmp, ne jamais throw (env + cookies = source de vérité).
+ * Persistance locale / best-effort.
+ * Sur Vercel : écrit dans `/tmp` si possible, sinon no-op (jamais d’EROFS).
+ * Identifiants prod = variables d’env ; uuid/FA = cookies.
  */
 export async function writeStoredCredentials(
   creds: EdCredentials
 ): Promise<void> {
-  const previous = (await readStoredCredentials()) ?? {
-    username: "",
-    password: "",
-  };
+  try {
+    await ensureStoreDir();
+    const previous = (await readStoredCredentials()) ?? {
+      username: "",
+      password: "",
+    };
 
-  // `cn: undefined` / `cv: undefined` = effacer explicitement (FA périmé)
-  const clearFa = "cn" in creds && !creds.cn;
+    const clearFa = "cn" in creds && !creds.cn;
 
-  const payload = {
-    username: creds.username.trim() || previous.username,
-    password: creds.password.trim() || previous.password,
-    studentName:
-      creds.studentName?.trim() || previous.studentName || "Maelle",
-    cn: clearFa ? undefined : creds.cn?.trim() || previous.cn || undefined,
-    cv: clearFa ? undefined : creds.cv?.trim() || previous.cv || undefined,
-    uuid: creds.uuid?.trim() || previous.uuid || undefined,
-  };
+    // Sur serverless, ne jamais écrire le mot de passe dans /tmp
+    const username = isServerlessRuntime()
+      ? previous.username || creds.username.trim()
+      : creds.username.trim() || previous.username;
+    const password = isServerlessRuntime()
+      ? previous.password || ""
+      : creds.password.trim() || previous.password;
 
-  let lastError: unknown;
-  for (const filePath of storePaths()) {
-    try {
-      await writeToPath(filePath, payload);
+    await writeFile(
+      STORE_PATH(),
+      JSON.stringify(
+        {
+          username,
+          password,
+          studentName:
+            creds.studentName?.trim() || previous.studentName || "Maelle",
+          cn: clearFa ? undefined : creds.cn?.trim() || previous.cn || undefined,
+          cv: clearFa ? undefined : creds.cv?.trim() || previous.cv || undefined,
+          uuid: creds.uuid?.trim() || previous.uuid || undefined,
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+  } catch (error) {
+    if (isReadonlyFsError(error) || isServerlessRuntime()) {
       return;
-    } catch (error) {
-      lastError = error;
-      if (isRoFsError(error)) continue;
     }
+    throw error;
   }
-
-  // Serverless / FS read-only : ignore (cookies + env portent le reste)
-  if (isServerless() || isRoFsError(lastError)) return;
-  throw lastError;
 }
 
 export async function resolveCredentials(options?: {
@@ -150,16 +128,11 @@ export async function resolveCredentials(options?: {
     };
   }
 
-  if (!stored) return null;
+  if (!stored?.username || !stored?.password) return null;
   return {
     ...stored,
     cn: options?.cookieCn || stored.cn,
     cv: options?.cookieCv || stored.cv,
     uuid: options?.cookieUuid || stored.uuid,
   };
-}
-
-/** true si ED_USERNAME / ED_PASSWORD sont définis (prod Vercel). */
-export function hasEnvCredentials(): boolean {
-  return Boolean(cleanEnv(process.env.ED_USERNAME) && cleanEnv(process.env.ED_PASSWORD));
 }

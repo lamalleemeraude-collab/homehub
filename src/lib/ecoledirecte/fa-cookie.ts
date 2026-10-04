@@ -2,7 +2,23 @@ import { cookies } from "next/headers";
 
 const COOKIE_CN = "ed_fa_cn";
 const COOKIE_CV = "ed_fa_cv";
-const COOKIE_UUID = "ed_device_uuid";
+const COOKIE_UUID = "ed_uuid";
+
+const FA_OPTS = {
+  path: "/",
+  maxAge: 60 * 60 * 24 * 180,
+  sameSite: "lax" as const,
+  secure: true,
+  httpOnly: true,
+};
+
+const UUID_OPTS = {
+  path: "/",
+  maxAge: 60 * 60 * 24 * 365,
+  sameSite: "lax" as const,
+  secure: true,
+  httpOnly: true,
+};
 
 export async function readFaFromCookie(): Promise<{
   cn?: string;
@@ -19,55 +35,30 @@ export async function readFaFromCookie(): Promise<{
       ...(uuid ? { uuid } : {}),
     };
   } catch {
-    // hors contexte request
+    return {};
   }
-  return {};
+}
+
+export function applyFaCookies(
+  response: { cookies: { set: (n: string, v: string, o: object) => void } },
+  cn: string,
+  cv: string
+): void {
+  response.cookies.set(COOKIE_CN, cn, FA_OPTS);
+  response.cookies.set(COOKIE_CV, cv, FA_OPTS);
 }
 
 export function applyUuidCookie(
   response: { cookies: { set: (n: string, v: string, o: object) => void } },
   uuid: string
 ): void {
-  response.cookies.set(COOKIE_UUID, uuid, {
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-    sameSite: "lax" as const,
-    secure: true,
-    httpOnly: true,
-  });
+  if (!uuid) return;
+  response.cookies.set(COOKIE_UUID, uuid, UUID_OPTS);
 }
 
-export function faCookieHeaders(cn: string, cv: string): HeadersInit {
-  const maxAge = 60 * 60 * 24 * 180; // 6 mois
-  const common = `Path=/; Max-Age=${maxAge}; SameSite=Lax; Secure; HttpOnly`;
-  return {
-    "Set-Cookie": [
-      `${COOKIE_CN}=${encodeURIComponent(cn)}; ${common}`,
-      `${COOKIE_CV}=${encodeURIComponent(cv)}; ${common}`,
-    ].join(", "),
-  };
-}
-
-/** Pour NextResponse — set cookies individuellement. */
-export function applyFaCookies(
-  response: { cookies: { set: (n: string, v: string, o: object) => void } },
-  cn: string,
-  cv: string
-): void {
-  const opts = {
-    path: "/",
-    maxAge: 60 * 60 * 24 * 180,
-    sameSite: "lax" as const,
-    secure: true,
-    httpOnly: true,
-  };
-  response.cookies.set(COOKIE_CN, cn, opts);
-  response.cookies.set(COOKIE_CV, cv, opts);
-}
-
-export function clearFaCookies(
-  response: { cookies: { set: (n: string, v: string, o: object) => void } }
-): void {
+export function clearFaCookies(response: {
+  cookies: { set: (n: string, v: string, o: object) => void };
+}): void {
   const opts = { path: "/", maxAge: 0 };
   response.cookies.set(COOKIE_CN, "", opts);
   response.cookies.set(COOKIE_CV, "", opts);

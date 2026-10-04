@@ -1,40 +1,53 @@
 import { NextResponse } from "next/server";
 import {
-  hasEnvCredentials,
   readStoredCredentials,
   resolveCredentials,
   writeStoredCredentials,
 } from "@/lib/ecoledirecte/credentials";
+import { isServerlessRuntime } from "@/lib/ecoledirecte/runtime-fs";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const creds = await resolveCredentials();
-  const fromEnv = hasEnvCredentials();
+  const fromEnv = Boolean(process.env.ED_USERNAME?.trim());
   return NextResponse.json({
     configured: Boolean(creds),
-    username: creds?.username ?? "",
+    username: fromEnv
+      ? process.env.ED_USERNAME?.trim() || ""
+      : creds?.username ?? "",
     source: fromEnv ? "env" : creds ? "file" : "none",
   });
 }
 
 export async function POST(request: Request) {
   try {
-    // Sur Vercel, les secrets doivent être en variables d’environnement.
-    if (hasEnvCredentials()) {
-      return NextResponse.json({
-        ok: true,
-        configured: true,
-        source: "env",
-        message: "Identifiants déjà configurés côté serveur (Vercel).",
-      });
-    }
-
     const body = (await request.json()) as {
       username?: string;
       password?: string;
       studentName?: string;
     };
+
+    // Prod Vercel : les secrets viennent des env vars (pas d’écriture disque)
+    if (isServerlessRuntime() && process.env.ED_USERNAME && process.env.ED_PASSWORD) {
+      return NextResponse.json({
+        ok: true,
+        configured: true,
+        source: "env",
+        message: "Identifiants déjà configurés sur le serveur.",
+      });
+    }
+
+    if (isServerlessRuntime()) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Sur Vercel, ajoute ED_USERNAME et ED_PASSWORD dans Project → Settings → Environment Variables, puis redéploie.",
+        },
+        { status: 503 }
+      );
+    }
 
     const previous = await readStoredCredentials();
     const username = body.username?.trim() || previous?.username || "";
@@ -54,10 +67,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, configured: true, source: "file" });
   } catch (error) {
     console.error("[api/ecoledirecte/credentials]", error);
-    const msg =
-      error instanceof Error && error.message.includes("read-only")
-        ? "Sur Vercel, ajoute ED_USERNAME et ED_PASSWORD dans les variables d’environnement du projet."
-        : "Impossible d’enregistrer.";
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "Impossible d’enregistrer. Sur Vercel, utilise les variables d’environnement ED_USERNAME / ED_PASSWORD.",
+      },
+      { status: 500 }
+    );
   }
 }

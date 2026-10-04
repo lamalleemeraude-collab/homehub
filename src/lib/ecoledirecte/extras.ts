@@ -177,6 +177,7 @@ async function loginSession(cookieFa?: {
   let uuid = creds.uuid;
   if (!uuid) {
     uuid = randomUUID();
+    creds.uuid = uuid;
     await writeStoredCredentials({ ...creds, uuid });
   }
   const fa =
