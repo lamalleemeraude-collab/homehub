@@ -644,6 +644,24 @@ function ReadyView({
 
       <div className={`mt-3 px-3.5 py-3.5 ${GLASS.panel}`}>
         <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-violet-600">
+          Aperçu des questions
+        </p>
+        <ol className="mt-2 space-y-1.5 text-[0.875rem] font-semibold text-slate-700">
+          {deck.cards.slice(0, 4).map((c, i) => (
+            <li key={c.id} className="leading-snug">
+              {i + 1}. {c.front}
+            </li>
+          ))}
+          {deck.cards.length > 4 && (
+            <li className="text-slate-500">
+              … et {deck.cards.length - 4} autres
+            </li>
+          )}
+        </ol>
+      </div>
+
+      <div className={`mt-3 px-3.5 py-3.5 ${GLASS.panel}`}>
+        <p className="text-[0.65rem] font-bold uppercase tracking-[0.14em] text-violet-600">
           Comment faire
         </p>
         <ol className="mt-2 space-y-1.5 text-[0.875rem] font-semibold text-slate-700">

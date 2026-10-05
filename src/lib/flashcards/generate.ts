@@ -1,5 +1,6 @@
 import type { HomeworkItem } from "@/lib/ecoledirecte/types";
 import {
+  ensureQuestionFront,
   fallbackFromCourse,
   fallbackFromHomework,
 } from "./fallback-generate";
@@ -12,9 +13,13 @@ import type {
 const SYSTEM = `Tu es un coach de révision pour une élève de 6e (collège, France).
 Tu crées des flashcards CLAIRES, COURTES, EXHAUSTIVES sur ce qu'il faut savoir.
 
-Règles :
+Règles OBLIGATOIRES :
 - Français simple, phrases courtes.
-- Recto = question ou "Complète…" ; verso = réponse exacte et complète.
+- Recto (front) = TOUJOURS une vraie question d'interrogation qui se termine par "?" (ou "Complète… : …").
+  Exemples OK : "Qu'est-ce que le périmètre ?", "Cite 3 causes de la Révolution.", "Complète : Un carré a …… côtés égaux."
+  INTERDIT : recopier la consigne du devoir, un titre, une date, "Histoire (2026-10-08)", ou un énoncé sans "?".
+- Verso (back) = réponse exacte et complète (le savoir à mémoriser), PAS la consigne "apprendre / réviser…".
+- Si le devoir ne contient que des consignes sans leçons : invente des questions de révision UNIQUEMENT à partir des notions explicitement citées ; sinon dis clairement qu'il faut le cours.
 - Couvre TOUT le contenu important : définitions, dates, règles, conjugaisons, formules, vocabulaire, étapes.
 - Pour une interrogation/contrôle : priorise ce qui tombe sûrement.
 - 8 à 16 cartes (assez pour réviser, pas trop pour l'élève).
@@ -49,10 +54,19 @@ function normalizeDeck(
     .slice(0, 16)
     .map((c, i) => ({
       id: `c-${i}`,
-      front: c.front!.trim(),
+      front: ensureQuestionFront(c.front!.trim(), fallbackMatiere),
       back: c.back!.trim(),
       tip: c.tip?.trim() || undefined,
-    }));
+    }))
+    // Rejette les cartes où le verso n'est qu'une consigne vide de savoir
+    .filter((c) => {
+      const back = c.back.toLowerCase();
+      const instructionOnly =
+        /^(réviser|revoir|apprendre|lire|faire|compléter)\b/.test(back) &&
+        back.length < 80 &&
+        !/[:=]/.test(c.back);
+      return !instructionOnly;
+    });
 
   if (cards.length === 0) {
     throw new Error("Aucune carte générée");
